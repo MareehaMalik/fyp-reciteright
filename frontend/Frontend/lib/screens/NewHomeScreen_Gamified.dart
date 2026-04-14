@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:tajweed_corrector/services/user_service.dart';
 import 'package:tajweed_corrector/services/stats_service.dart';
 import 'ProfileScreen.dart';
@@ -8,6 +7,8 @@ import 'EnhancedReciteScreen.dart';
 import 'TajweedLessonsScreen.dart';
 import 'EnhancedProgressScreen.dart';
 import 'SurahListScreen.dart';
+import 'package:tajweed_corrector/screens/MistakesScreen.dart';
+import 'package:tajweed_corrector/screens/MemorizationScreen.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
@@ -771,11 +772,32 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                   width: 80,
                   child: ElevatedButton(
                     onPressed: () {
+                      final title = (item['title'] ?? '').toString().toLowerCase();
+                      if (title.contains('mistake')) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MistakesScreen(),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (title.contains('memorize') || title.contains('memorization')) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MemorizationScreen(),
+                          ),
+                        );
+                        return;
+                      }
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) =>
-                                const TajweedLessonsScreen()),
+                          builder: (context) => const TajweedLessonsScreen(),
+                        ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -846,6 +868,16 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             context,
             MaterialPageRoute(
                 builder: (context) => const TajweedLessonsScreen()),
+          );
+        } else if (action['label'].contains('Mistakes')) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MistakesScreen()),
+          );
+        } else if (action['label'].contains('Recordings')) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const EnhancedProgressScreen()),
           );
         }
       },

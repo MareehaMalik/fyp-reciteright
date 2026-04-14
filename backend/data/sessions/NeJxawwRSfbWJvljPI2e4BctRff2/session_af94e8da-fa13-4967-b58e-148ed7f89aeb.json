@@ -1,0 +1,66 @@
+{
+  "id": "af94e8da-fa13-4967-b58e-148ed7f89aeb",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 1,
+  "mode": "recitation",
+  "accuracy_score": 38.6,
+  "whisper_score": 5.0,
+  "mfcc_score": 8.8,
+  "date_time": "2026-04-14T06:59:33.901276Z",
+  "duration_seconds": 8,
+  "mistakes": [
+    {
+      "word": "بِسْمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [],
+      "errorType": "close",
+      "similarity": 0.57,
+      "occurredAt": "2026-04-14T06:59:09.759388Z"
+    },
+    {
+      "word": "ٱللَّهِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.75,
+      "occurredAt": "2026-04-14T06:59:09.761989Z"
+    },
+    {
+      "word": "ٱلرَّحْمَـٰنِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T06:59:09.762079Z"
+    },
+    {
+      "word": "ٱلرَّحِيمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T06:59:09.762120Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 0,
+  "close_words": 2,
+  "missing_words": 2,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001001.mp3",
+  "transcribed_text": "ميسم الله ويجواره نجوار",
+  "correct_text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+}

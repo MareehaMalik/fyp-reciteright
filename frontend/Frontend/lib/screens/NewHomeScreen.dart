@@ -10,6 +10,8 @@ import 'EnhancedReciteScreen.dart';
 import 'TajweedLessonsScreen.dart';
 import 'EnhancedProgressScreen.dart';
 import 'SurahListScreen.dart';
+import 'MemorizationScreen.dart';
+import 'MistakesScreen.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
@@ -237,6 +239,27 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               final item = _todayItems[index];
               return GestureDetector(
                 onTap: () {
+                  final title = (item['title'] ?? '').toString().toLowerCase();
+                  if (title.contains('memorize') || title.contains('memorization')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MemorizationScreen(),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (title.contains('mistake')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MistakesScreen(),
+                      ),
+                    );
+                    return;
+                  }
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -1188,6 +1211,17 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             height: 44,
             child: ElevatedButton.icon(
               onPressed: () {
+                final lesson = _todayLessonRule.toLowerCase();
+                if (lesson.contains('memorize') || lesson.contains('memorization')) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MemorizationScreen(),
+                    ),
+                  );
+                  return;
+                }
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -1247,7 +1281,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const EnhancedProgressScreen()),
+                builder: (context) => const MistakesScreen()),
           );
         },
       },

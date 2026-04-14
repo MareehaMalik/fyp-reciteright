@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:tajweed_corrector/data/quran_data.dart';
+import 'package:tajweed_corrector/services/session_service.dart';
 
 /// Displays real DTW comparison results between user and Qari recitation
 /// Shows: overall score, grade, waveforms, and detailed metrics breakdown
@@ -11,6 +13,7 @@ class ComparisonResultsScreen extends StatefulWidget {
   final Map<String, dynamic> comparisonResult;
   final String? referenceAudioUrl;
   final String? userAudioPath;
+  final String recitationMode;
 
   const ComparisonResultsScreen({
     super.key,
@@ -19,6 +22,7 @@ class ComparisonResultsScreen extends StatefulWidget {
     required this.comparisonResult,
     this.referenceAudioUrl,
     this.userAudioPath,
+    this.recitationMode = 'practice',
   });
 
   @override
@@ -29,6 +33,8 @@ class ComparisonResultsScreen extends StatefulWidget {
 class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
   late AudioPlayer _userPlayer;
   late AudioPlayer _qariPlayer;
+  final SessionService _sessionService = SessionService();
+  bool _sessionSaved = false;
   bool isPlayingUser = false;
   bool isPlayingQari = false;
 
@@ -37,6 +43,8 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
     super.initState();
     _userPlayer = AudioPlayer();
     _qariPlayer = AudioPlayer();
+
+    _persistSessionFromResult();
 
     // Listen to player state changes
     _userPlayer.playerStateStream.listen((playerState) {
@@ -57,6 +65,90 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
     _userPlayer.dispose();
     _qariPlayer.dispose();
     super.dispose();
+  }
+
+  Future<void> _persistSessionFromResult() async {
+    if (_sessionSaved) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final metrics = widget.comparisonResult['metrics'] as Map<String, dynamic>? ?? {};
+      final List<dynamic> words = widget.comparisonResult['word_results'] as List? ?? const [];
+
+      final mistakes = words
+          .where((w) => (w as Map<String, dynamic>)['status'] != 'correct')
+          .map((w) {
+            final word = w as Map<String, dynamic>;
+            final tajweedRules = (word['tajweed_rules'] as List?)
+                    ?.map((r) => (r is Map<String, dynamic>) ? (r['rule'] ?? '').toString() : r.toString())
+                    .where((r) => r.isNotEmpty)
+                    .toList() ??
+                const <String>[];
+
+            return {
+              'word': (word['word'] ?? word['correct_word'] ?? '').toString(),
+              'ayah': widget.verse,
+              'surah': widget.surah,
+              'tajweedRules': tajweedRules,
+              'errorType': (word['status'] ?? 'mispronunciation').toString(),
+              'similarity': ((word['similarity'] as num?)?.toDouble() ?? 0.0).clamp(0.0, 1.0),
+              'occurredAt': DateTime.now().toUtc().toIso8601String(),
+            };
+          })
+          .where((m) => (m['word'] as String).trim().isNotEmpty)
+          .toList();
+
+      final totalWords = words.length;
+      final correctWords = words.where((w) => (w as Map<String, dynamic>)['status'] == 'correct').length;
+      final closeWords = words.where((w) => (w as Map<String, dynamic>)['status'] == 'close').length;
+      final missingWords = words.where((w) => (w as Map<String, dynamic>)['status'] == 'missing').length;
+      final extraWords = words.where((w) => (w as Map<String, dynamic>)['status'] == 'extra').length;
+
+      final durationSeconds =
+          ((widget.comparisonResult['duration_seconds'] as num?)?.toInt() ??
+                  ((widget.comparisonResult['inference_time_ms'] as num?)?.toInt() ?? 0) ~/ 1000)
+              .clamp(1, 60 * 60);
+
+      final saved = await _sessionService.saveSession(
+        userId: user.uid,
+        surah: widget.surah,
+        ayah: widget.verse,
+        mode: widget.recitationMode == 'memorization' ? 'memorization' : 'practice',
+        accuracyScore: (widget.comparisonResult['overall_score'] as num?)?.toDouble() ?? 0.0,
+        whisperScore: (metrics['whisper_score'] as num?)?.toDouble() ?? 0.0,
+        mfccScore: (metrics['mfcc_score'] as num?)?.toDouble() ?? 0.0,
+        durationSeconds: durationSeconds,
+        mistakes: mistakes,
+        totalWords: totalWords,
+        correctWords: correctWords,
+        closeWords: closeWords,
+        missingWords: missingWords,
+        extraWords: extraWords,
+        referenceAudioUrl: widget.referenceAudioUrl,
+        transcribedText: (widget.comparisonResult['transcribed_text'] ?? '').toString(),
+        correctText: (widget.comparisonResult['correct_text'] ?? '').toString(),
+      );
+
+      if (widget.recitationMode == 'memorization') {
+        await _sessionService.updateMemorization(
+          userId: user.uid,
+          surah: widget.surah,
+          ayah: widget.verse,
+          overallScore: (widget.comparisonResult['overall_score'] as num?)?.toDouble() ?? 0.0,
+          sessionId: (saved['sessionId'] ?? '').toString(),
+          wordResults: words.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList(),
+          recordedAt: DateTime.now().toUtc().toIso8601String(),
+          whisperScore: (metrics['whisper_score'] as num?)?.toDouble(),
+          mfccScore: (metrics['mfcc_score'] as num?)?.toDouble(),
+        );
+      }
+
+      _sessionSaved = true;
+    } catch (_) {
+      // Non-blocking: UI should still display compare result even if metrics save fails.
+    }
   }
 
   /// Get color based on accuracy score

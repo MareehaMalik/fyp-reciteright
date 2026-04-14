@@ -20,13 +20,15 @@ from gamification_logic import (
     get_month_start_date,
     LEVEL_TITLES,
 )
+from database import get_database
 
 
 class GamificationService:
     """Service for aggregating gamification metrics"""
 
     def __init__(self):
-        self.sessions: Dict[str, List[Session]] = {}  # user_id -> sessions
+        self.db = get_database()
+        self.sessions: Dict[str, List[Session]] = {}  # user_id -> sessions (cache)
         self.memorization_progress: Dict[str, Dict[int, MemorizationProgress]] = {}
         self.user_profiles: Dict[str, Dict[str, Any]] = {}
 
@@ -36,11 +38,39 @@ class GamificationService:
         session_data: Dict[str, Any]
     ) -> None:
         """Add a new session for a user"""
+        # Save to database
+        self.db.save_session(user_id, session_data)
+
+        # Update cache
         if user_id not in self.sessions:
             self.sessions[user_id] = []
 
         session = Session(**session_data)
         self.sessions[user_id].append(session)
+
+    def get_user_sessions(self, user_id: str) -> List[Session]:
+        """Get all sessions for a user (loads from database if not cached)"""
+        if user_id not in self.sessions:
+            # Load from database
+            session_dicts = self.db.get_user_sessions(user_id)
+            self.sessions[user_id] = [Session(**s) for s in session_dicts]
+
+        return self.sessions[user_id]
+
+    def get_or_create_user(self, user_id: str) -> Dict[str, Any]:
+        """Get user profile or create if doesn't exist"""
+        user = self.db.get_user(user_id)
+
+        if not user:
+            # Create default user
+            user = self.db.create_user(
+                user_id=user_id,
+                name=f"User {user_id[:8]}",
+                email=f"{user_id}@example.com",
+                daily_goal_minutes=10
+            )
+
+        return user
 
     def get_home_metrics(
         self,
@@ -59,20 +89,28 @@ class GamificationService:
         Returns:
             HomeMetrics with all aggregated data
         """
-        sessions = self.sessions.get(user_id, [])
-        memo_progress = self.memorization_progress.get(user_id, {})
+        # Load sessions from database
+        sessions = self.get_user_sessions(user_id)
+
+        # Convert to dict format expected by logic functions
+        session_dicts = [s.to_dict() for s in sessions]
+
+        # Convert back to Session objects for logic functions
+        sessions_obj = [Session(**s) for s in session_dicts]
+
+        memo_progress = self.db.get_memorization_progress(user_id)
 
         # Daily progress
         daily_goal = user_profile.get("daily_goal_minutes", 10)
-        daily_metrics = get_today_progress(sessions, today_date, daily_goal)
+        daily_metrics = get_today_progress(sessions_obj, today_date, daily_goal)
 
         # Streak
         longest_streak_record = user_profile.get("longest_streak", 0)
-        streak_info = get_current_streak(sessions, today_date, longest_streak_record)
+        streak_info = get_current_streak(sessions_obj, today_date, longest_streak_record)
 
         # Week summary
         week_start = get_week_start_date(today_date)
-        week_metrics = get_week_summary(sessions, week_start)
+        week_metrics = get_week_summary(sessions_obj, week_start)
 
         # Level
         total_xp = user_profile.get("xp", 0)
@@ -99,7 +137,7 @@ class GamificationService:
 
         # Check if new user
         joined_at = user_profile.get("joined_at", "")
-        new_user = is_new_user(joined_at, sessions)
+        new_user = is_new_user(joined_at, sessions_obj)
 
         return HomeMetrics(
             is_new_user=new_user,

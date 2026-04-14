@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tajweed_corrector/models/memorization_summary.dart';
+import 'package:tajweed_corrector/services/session_service.dart';
 import 'AyahDisplayScreen.dart';
 
 const Color PRIMARY_COLOR = Color(0xFF1E4976);
@@ -9,7 +12,14 @@ const Color TEXT_PRIMARY = Color(0xFF1a1a1a);
 const Color TEXT_SECONDARY_COLOR = Color(0xFF666666);
 
 class SurahListScreen extends StatefulWidget {
-  const SurahListScreen({super.key});
+  final String recitationMode;
+  final int? initialAyahNumber;
+
+  const SurahListScreen({
+    super.key,
+    this.recitationMode = 'practice',
+    this.initialAyahNumber,
+  });
 
   @override
   State<SurahListScreen> createState() => _SurahListScreenState();
@@ -17,7 +27,9 @@ class SurahListScreen extends StatefulWidget {
 
 class _SurahListScreenState extends State<SurahListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final SessionService _sessionService = SessionService();
   List<Map<String, dynamic>> filteredSurahs = [];
+  final Map<int, SurahMemorizationSummary> _memorizationBySurah = {};
 
   // All 114 Surahs - hardcoded data
   final List<Map<String, dynamic>> allSurahs = [
@@ -141,6 +153,25 @@ class _SurahListScreenState extends State<SurahListScreen> {
   void initState() {
     super.initState();
     filteredSurahs = List.from(allSurahs);
+    _loadMemorizationSummary();
+  }
+
+  Future<void> _loadMemorizationSummary() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final summary = await _sessionService.getMemorizationSummary(userId: user.uid);
+      if (!mounted) return;
+
+      setState(() {
+        _memorizationBySurah
+          ..clear()
+          ..addEntries(summary.surahSummaries.map((s) => MapEntry(s.surahNumber, s)));
+      });
+    } catch (_) {
+      // Non-blocking; screen remains usable without memorization badges.
+    }
   }
 
   void _filterSurahs(String query) {
@@ -231,12 +262,19 @@ class _SurahListScreenState extends State<SurahListScreen> {
   }
 
   Widget _buildSurahCard(Map<String, dynamic> surah) {
+    final surahNumber = surah['number'] as int;
+    final memo = _memorizationBySurah[surahNumber];
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AyahDisplayScreen(surah: surah),
+            builder: (context) => AyahDisplayScreen(
+              surah: surah,
+              recitationMode: widget.recitationMode,
+              initialAyahNumber: widget.initialAyahNumber,
+            ),
           ),
         );
       },
@@ -298,6 +336,27 @@ class _SurahListScreenState extends State<SurahListScreen> {
                         color: TEXT_SECONDARY_COLOR,
                       ),
                     ),
+                    if (memo != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '${memo.memorizedAyahs} / ${memo.totalAyahs} ayahs memorized',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: (memo.percentMemorized / 100).clamp(0.0, 1.0),
+                          minHeight: 5,
+                          backgroundColor: Colors.grey[200],
+                          valueColor: const AlwaysStoppedAnimation(Color(0xFF2E7D32)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

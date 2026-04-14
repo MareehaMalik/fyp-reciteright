@@ -4,7 +4,14 @@ import 'SurahListScreen.dart';
 const Color PRIMARY_COLOR = Color(0xFF1E4976);
 
 class EnhancedReciteScreen extends StatefulWidget {
-  const EnhancedReciteScreen({super.key});
+  final String recitationMode;
+  final int? initialAyahNumber;
+
+  const EnhancedReciteScreen({
+    super.key,
+    this.recitationMode = 'practice',
+    this.initialAyahNumber,
+  });
 
   @override
   State<EnhancedReciteScreen> createState() => _EnhancedReciteScreenState();
@@ -18,7 +25,10 @@ class _EnhancedReciteScreenState extends State<EnhancedReciteScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const SurahListScreen(),
+          builder: (context) => SurahListScreen(
+            recitationMode: widget.recitationMode,
+            initialAyahNumber: widget.initialAyahNumber,
+          ),
         ),
       );
     });

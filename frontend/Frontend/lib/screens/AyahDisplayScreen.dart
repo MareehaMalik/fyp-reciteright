@@ -13,8 +13,15 @@ import 'package:tajweed_corrector/services/theme_service.dart';
 
 class AyahDisplayScreen extends StatefulWidget {
   final Map<String, dynamic> surah;
+  final String recitationMode;
+  final int? initialAyahNumber;
 
-  const AyahDisplayScreen({super.key, required this.surah});
+  const AyahDisplayScreen({
+    super.key,
+    required this.surah,
+    this.recitationMode = 'practice',
+    this.initialAyahNumber,
+  });
 
   @override
   State<AyahDisplayScreen> createState() => _AyahDisplayScreenState();
@@ -127,7 +134,12 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
         _ayahs = mapped;
         _isLoadingAyahs = false;
         if (_ayahs.isNotEmpty) {
-          _selectedAyahIndex = 0;
+          if (widget.initialAyahNumber != null) {
+            final idx = _ayahs.indexWhere((a) => a['number'] == widget.initialAyahNumber);
+            _selectedAyahIndex = idx >= 0 ? idx : 0;
+          } else {
+            _selectedAyahIndex = 0;
+          }
           _rangeStartAyah = _ayahs.first['number'] as int;
           _rangeEndAyah = _ayahs.first['number'] as int;
         }
@@ -336,6 +348,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
             comparisonResult: result,
             referenceAudioUrl: _audioUrlForAyahNumber(ayah['number'] as int),
             userAudioPath: _recordingPath,
+            recitationMode: widget.recitationMode,
           ),
         ),
       );

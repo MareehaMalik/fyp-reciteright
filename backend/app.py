@@ -241,7 +241,7 @@ def analyze_tajweed(word, next_word="", prev_word=""):
         })
 
     # QALQALAH (Echo/Bounce)
-    qalqalah_letters = '\u0642\u0637\u0628\u062C\u062F'
+    qalqalah_letters = '\u0642\u0637\u0628\u062C\u062D'
     if re.search(f'[{qalqalah_letters}]\u0652', word) or \
        (word and word[-1] in qalqalah_letters):
         level = "Major" if (word and word[-1] in qalqalah_letters) else "Minor"
@@ -260,7 +260,7 @@ def analyze_tajweed(word, next_word="", prev_word=""):
 
     if (has_noon_saakin or has_tanwin) and next_word:
         first_letter = next_word[0] if next_word else ''
-        ikhfa_letters = '\u062A\u062B\u062C\u062F\u0630\u0632\u0633\u0634\u0635\u0636\u0637\u0638\u0641\u0642\u0643'
+        ikhfa_letters = '\u062A\u062B\u062C\u062D\u0632\u0633\u0634\u0635\u0636\u0637\u0638\u0641\u0642\u0643'
         idgham_with_ghunnah = '\u064A\u0646\u0645\u0648'
         idgham_without_ghunnah = '\u0644\u0631'
         iqlab_letter = '\u0628'
@@ -409,8 +409,8 @@ def detect_tajweed_rules(word, next_word=""):
             "description": "Nasalize through nose for 2 counts"
         })
 
-    if re.search(r'[\u0642\u0637\u0628\u062C\u062F][\u0652]', word) or \
-       re.search(r'[\u0642\u0637\u0628\u062C\u062F]$', word):
+    if re.search(r'[\u0642\u0637\u0628\u062C\u062D][\u0652]', word) or \
+       re.search(r'[\u0642\u0637\u0628\u062C\u062D]$', word):
         rules.append({
             "rule": "Qalqalah",
             "color": "#E65100",
@@ -1026,6 +1026,30 @@ def transcribe():
     finally:
         if os.path.exists(audio_tmp.name):
             os.unlink(audio_tmp.name)
+
+# ════════════════════════════════════════════════════════════════════════════════
+# SETUP GAMIFICATION ROUTES
+# ════════════════════════════════════════════════════════════════════════════════
+try:
+    from gamification_routes import setup_gamification_routes
+    setup_gamification_routes(app)
+    print("✅ Gamification routes initialized")
+except Exception as e:
+    print(f"⚠️ Warning: Could not load gamification routes: {e}")
+    import traceback
+    traceback.print_exc()
+
+# ════════════════════════════════════════════════════════════════════════════════
+# SETUP SESSION & PROGRESS ROUTES
+# ════════════════════════════════════════════════════════════════════════════════
+try:
+    from session_routes import setup_session_routes
+    setup_session_routes(app)
+    print("✅ Session and progress routes initialized")
+except Exception as e:
+    print(f"⚠️ Warning: Could not load session routes: {e}")
+    import traceback
+    traceback.print_exc()
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000, host="0.0.0.0")
