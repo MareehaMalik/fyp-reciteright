@@ -44,7 +44,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
   // Today's Items Carousel
   final List<Map<String, dynamic>> _todayItems = [
     {
-      'icon': '✨',
+      'icon': Icons.auto_awesome_rounded,
       'title': 'Tajweed: Ghunnah',
       'action': 'lesson',
       'description': 'Master the nasalization rule',
@@ -54,7 +54,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       'bgColor': const Color(0xFFC8E6C9),
     },
     {
-      'icon': '🔄',
+      'icon': Icons.autorenew_rounded,
       'title': 'Review Mistakes',
       'action': 'mistakes',
       'description': '3 words from yesterday',
@@ -64,7 +64,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       'bgColor': const Color(0xFFFFE0B2),
     },
     {
-      'icon': '📚',
+      'icon': Icons.menu_book_rounded,
       'title': 'Memorize Today',
       'action': 'memorization',
       'description': 'Surah Al-Ikhlas (2 ayahs)',
@@ -74,7 +74,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       'bgColor': const Color(0xFFBBDEFB),
     },
     {
-      'icon': '⚡',
+      'icon': Icons.flash_on_rounded,
       'title': 'Fluency Check',
       'action': 'lesson',
       'description': 'Quick 1-minute practice',
@@ -222,11 +222,6 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
                     // State-Aware Hero Card
                     _buildHeroCard(isDark),
-
-                    const SizedBox(height: 24),
-
-                    // Progress & Streak Strip
-                    _buildProgressStreakStrip(isDark),
 
                     const SizedBox(height: 24),
 
@@ -402,7 +397,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          '😊 Are you ready to recite?',
+                          'Are you ready to recite?',
                           style: TextStyle(
                             fontSize: 14,
                             color: subtextColor,
@@ -423,6 +418,126 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildHeaderStatsRow(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderStatsRow(bool isDark) {
+    final cardColor = isDark ? const Color(0xFF2A2A30) : Colors.white;
+    final borderColor = isDark ? Colors.grey[700]! : Colors.grey[200]!;
+    final textColor = isDark ? Colors.white : const Color(0xFF1E4976);
+    final subtextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    final progressPercent =
+        (_dailyMinutesCompleted / _dailyGoalMinutes).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const EnhancedProgressScreen()),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildHeaderStatTile(
+                icon: Icons.timelapse_rounded,
+                iconColor: const Color(0xFF1E4976),
+                title: 'Today',
+                value: '${(progressPercent * 100).toInt()}%',
+                subtitle: '$_dailyMinutesCompleted/$_dailyGoalMinutes min',
+                textColor: textColor,
+                subtextColor: subtextColor,
+              ),
+            ),
+            Expanded(
+              child: _buildHeaderStatTile(
+                icon: Icons.local_fire_department_rounded,
+                iconColor: const Color(0xFFFF6F00),
+                title: 'Streak',
+                value: _currentStreak > 0 ? '$_currentStreak d' : '0 d',
+                subtitle: _currentStreak > 0 ? 'Keep going' : 'Start today',
+                textColor: textColor,
+                subtextColor: subtextColor,
+              ),
+            ),
+            Expanded(
+              child: _buildHeaderStatTile(
+                icon: Icons.verified_rounded,
+                iconColor: const Color(0xFF2E5F8F),
+                title: 'Level',
+                value: '$_userLevel',
+                subtitle: _userLevelName,
+                textColor: textColor,
+                subtextColor: subtextColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderStatTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required String subtitle,
+    required Color textColor,
+    required Color? subtextColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              color: subtextColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              color: textColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9,
+              color: subtextColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -453,11 +568,72 @@ class _NewHomeScreenState extends State<NewHomeScreen>
           ),
         ],
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_isNewUser) ...[
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: -30,
+                      top: -20,
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: -25,
+                      bottom: -30,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.06),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 36,
+                      bottom: 72,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.22),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 56,
+                      bottom: 46,
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isNewUser) ...[
             const Text(
               '🎉 Start Your Journey',
               style: TextStyle(
@@ -509,7 +685,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                 ),
               ),
             ),
-          ] else ...[
+                  ] else ...[
             const Text(
               '✨ Continue reciting',
               style: TextStyle(
@@ -518,12 +694,12 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               '$_nextSurah $_nextAyah–${_nextAyah + 2}',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -532,59 +708,44 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               'Last recited $_lastRecitedTime',
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const EnhancedReciteScreen()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: SizedBox(
+                height: 38,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const EnhancedReciteScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF1E4976),
+                    elevation: 0,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+                    minimumSize: const Size(0, 38),
+                    shape: const StadiumBorder(),
                   ),
-                ),
-                child: const Text(
-                  'Resume Recitation',
-                  style: TextStyle(
-                    color: Color(0xFF1E4976),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                  child: const Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: _changeSurah,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.white, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Change Surah',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
+                  ],
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -647,7 +808,11 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             // Streak
             Column(
               children: [
-                const Text('🔥', style: TextStyle(fontSize: 32)),
+                const Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 32,
+                  color: Color(0xFFFF6F00),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   'Streak',
@@ -681,7 +846,11 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                   ),
                   child: Column(
                     children: [
-                      const Text('⭐', style: TextStyle(fontSize: 20)),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 20,
+                        color: Color(0xFF1E4976),
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         'Level',
@@ -803,7 +972,19 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(item['icon'], style: const TextStyle(fontSize: 28)),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: (item['color'] as Color).withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    (item['icon'] as IconData?) ?? Icons.auto_awesome_rounded,
+                    size: 24,
+                    color: item['color'] as Color,
+                  ),
+                ),
                 Container(
                   padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

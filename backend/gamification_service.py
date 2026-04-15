@@ -4,6 +4,7 @@ Gamification API Endpoints for ReciteRight
 Integrates with Flask app to provide home metrics and session tracking
 """
 from typing import Dict, Any, List
+from datetime import datetime
 from gamification_models import Session, HomeMetrics, MemorizationProgress
 from gamification_logic import (
     get_today_progress,
@@ -38,22 +39,80 @@ class GamificationService:
         session_data: Dict[str, Any]
     ) -> None:
         """Add a new session for a user"""
+        normalized = self._normalize_session_payload(session_data)
+
         # Save to database
-        self.db.save_session(user_id, session_data)
+        self.db.save_session(user_id, normalized)
 
         # Update cache
         if user_id not in self.sessions:
             self.sessions[user_id] = []
 
-        session = Session(**session_data)
+        session = Session(**normalized)
         self.sessions[user_id].append(session)
+
+    @staticmethod
+    def _to_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _to_float(value: Any, default: float = 0.0) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _normalize_session_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Map persisted session variants into the Session dataclass schema."""
+        ayah_value = payload.get("ayah")
+
+        start_ayah = payload.get("start_ayah", payload.get("startAyah"))
+        if start_ayah is None:
+            start_ayah = ayah_value
+
+        end_ayah = payload.get("end_ayah", payload.get("endAyah"))
+        if end_ayah is None:
+            end_ayah = start_ayah
+
+        date_value = payload.get("date")
+        if not date_value:
+            iso_stamp = payload.get("date_time") or payload.get("created_at")
+            if isinstance(iso_stamp, str) and len(iso_stamp) >= 10:
+                date_value = iso_stamp[:10]
+
+        created_at = payload.get("created_at") or payload.get("date_time")
+        if not created_at:
+            created_at = datetime.utcnow().isoformat() + "Z"
+
+        duration_minutes = payload.get("duration_minutes")
+        if duration_minutes is None:
+            duration_seconds = self._to_float(payload.get("duration_seconds"), 0.0)
+            duration_minutes = duration_seconds / 60.0
+
+        return {
+            "id": str(payload.get("id", "")),
+            "user_id": str(payload.get("user_id") or payload.get("userId") or ""),
+            "surah": self._to_int(payload.get("surah"), 0),
+            "start_ayah": self._to_int(start_ayah, 1),
+            "end_ayah": self._to_int(end_ayah, self._to_int(start_ayah, 1)),
+            "duration_minutes": self._to_float(duration_minutes, 0.0),
+            "date": str(date_value or ""),
+            "accuracy_score": self._to_float(payload.get("accuracy_score", payload.get("accuracyScore")), 0.0),
+            "mode": str(payload.get("mode", "recitation")),
+            "created_at": str(created_at),
+            "xp_earned": self._to_int(payload.get("xp_earned", payload.get("xpEarned", 0)), 0),
+        }
 
     def get_user_sessions(self, user_id: str) -> List[Session]:
         """Get all sessions for a user (loads from database if not cached)"""
         if user_id not in self.sessions:
             # Load from database
             session_dicts = self.db.get_user_sessions(user_id)
-            self.sessions[user_id] = [Session(**s) for s in session_dicts]
+            normalized_sessions = [self._normalize_session_payload(s) for s in session_dicts]
+            self.sessions[user_id] = [Session(**s) for s in normalized_sessions]
 
         return self.sessions[user_id]
 

@@ -287,7 +287,8 @@ class _RealProgressScreenState extends State<RealProgressScreen> {
               child: _buildStreakCard(
                 title: 'Current Streak',
                 value: streak.currentStreakDays,
-                icon: '🔥',
+                icon: Icons.local_fire_department_rounded,
+                iconColor: const Color(0xFFFF6F00),
               ),
             ),
             const SizedBox(width: 12),
@@ -295,7 +296,8 @@ class _RealProgressScreenState extends State<RealProgressScreen> {
               child: _buildStreakCard(
                 title: 'Longest Streak',
                 value: streak.longestStreakDays,
-                icon: '👑',
+                icon: Icons.emoji_events_rounded,
+                iconColor: const Color(0xFFF9A825),
               ),
             ),
           ],
@@ -307,7 +309,8 @@ class _RealProgressScreenState extends State<RealProgressScreen> {
   Widget _buildStreakCard({
     required String title,
     required int value,
-    required String icon,
+    required IconData icon,
+    required Color iconColor,
   }) {
     return Card(
       elevation: 2,
@@ -316,9 +319,10 @@ class _RealProgressScreenState extends State<RealProgressScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(
+            Icon(
               icon,
-              style: const TextStyle(fontSize: 32),
+              size: 32,
+              color: iconColor,
             ),
             const SizedBox(height: 8),
             Text(

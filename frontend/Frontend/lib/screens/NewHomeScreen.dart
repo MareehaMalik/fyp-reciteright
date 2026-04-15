@@ -896,9 +896,10 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             // Center: Streak
             Column(
               children: [
-                Text(
-                  '🔥',
-                  style: TextStyle(fontSize: 32, height: 1),
+                const Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 32,
+                  color: Color(0xFFFF6F00),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -935,9 +936,10 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                   ),
                   child: Column(
                     children: [
-                      Text(
-                        '⭐',
-                        style: TextStyle(fontSize: 20),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 20,
+                        color: Color(0xFF1E4976),
                       ),
                       const SizedBox(height: 2),
                       Text(

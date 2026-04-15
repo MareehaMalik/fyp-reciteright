@@ -463,6 +463,19 @@ def get_surah_memorization_percent(
     return round((ayah_count_memorized / total_ayahs) * 100, 1)
 
 
+def _get_ayah_count_memorized(progress: Any) -> int:
+    """Read memorized ayah count from either dataclass or persisted dict payload."""
+    if isinstance(progress, dict):
+        value = progress.get("ayah_count_memorized", 0)
+    else:
+        value = getattr(progress, "ayah_count_memorized", 0)
+
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
 def get_overall_memorization_percent(
     memorization_progress: Dict[int, MemorizationProgress]
 ) -> float:
@@ -474,7 +487,7 @@ def get_overall_memorization_percent(
     total_ayahs = 0
 
     for surah, prog in memorization_progress.items():
-        total_memorized += prog.ayah_count_memorized
+        total_memorized += _get_ayah_count_memorized(prog)
         total_ayahs += SURAH_AYAH_COUNTS.get(surah, 0)
 
     if total_ayahs == 0:
@@ -491,13 +504,14 @@ def get_top_surahs(
     top_surahs = []
 
     for surah, prog in memorization_progress.items():
-        if prog.ayah_count_memorized > 0:
-            percent = get_surah_memorization_percent(surah, prog.ayah_count_memorized)
+        ayah_count_memorized = _get_ayah_count_memorized(prog)
+        if ayah_count_memorized > 0:
+            percent = get_surah_memorization_percent(surah, ayah_count_memorized)
             top_surahs.append({
                 "surahNumber": surah,
                 "surahName": SURAH_NAMES.get(surah, f"Surah {surah}"),
                 "memorizedPercent": percent,
-                "ayahCountMemorized": prog.ayah_count_memorized,
+                "ayahCountMemorized": ayah_count_memorized,
                 "totalAyahs": SURAH_AYAH_COUNTS.get(surah, 0)
             })
 

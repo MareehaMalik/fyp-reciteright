@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tajweed_corrector/models/gamification_models.dart';
 import 'package:tajweed_corrector/models/memorization_summary.dart';
+import 'package:tajweed_corrector/services/gamification_service.dart';
 import 'package:tajweed_corrector/models/session_models.dart';
 import 'package:tajweed_corrector/services/session_service.dart';
 
@@ -13,6 +15,7 @@ class EnhancedProgressScreen extends StatefulWidget {
 
 class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
   final SessionService _sessionService = SessionService();
+  final GamificationService _gamificationService = GamificationService();
 
   bool isLoading = true;
   String? errorText;
@@ -20,6 +23,8 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
   int thisWeekCount = 0;
   double averageAccuracy = 0;
   int perfectCount = 0;
+  int currentStreak = 0;
+  int longestStreak = 0;
   double memorizationOverall = 0.0;
   List<SurahMemorizationSummary> topSurahs = const [];
 
@@ -59,6 +64,7 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
 
       WeeklyProgressSummary? progress;
       MemorizationSummary? memorization;
+      HomeMetrics? homeMetrics;
       final loadErrors = <String>[];
 
       try {
@@ -71,6 +77,12 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
         memorization = await _sessionService.getMemorizationSummary(userId: user.uid);
       } catch (e) {
         loadErrors.add('memorization');
+      }
+
+      try {
+        homeMetrics = await _gamificationService.getHomeMetrics(userId: user.uid);
+      } catch (e) {
+        loadErrors.add('streak');
       }
 
       final updatedWeekly = {
@@ -92,6 +104,8 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
         thisWeekCount = progress?.thisWeekCount ?? 0;
         averageAccuracy = progress?.avgAccuracy ?? 0;
         perfectCount = progress?.perfectCount ?? 0;
+        currentStreak = homeMetrics?.currentStreak ?? 0;
+        longestStreak = homeMetrics?.longestStreak ?? 0;
         weeklyActivity
           ..clear()
           ..addAll(updatedWeekly);
@@ -148,6 +162,8 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
                       ),
 
                     _buildStatsCard(),
+                    const SizedBox(height: 16),
+                    _buildStreakCard(),
                     const SizedBox(height: 24),
                     _buildWeeklyStatsCard(),
                     const SizedBox(height: 24),
@@ -285,6 +301,60 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
                 }).toList(),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.local_fire_department,
+            color: Color(0xFFE65100),
+            size: 26,
+          ),
+          const SizedBox(width: 10),
+          const Text(
+            'Streak',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E4976),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$currentStreak day${currentStreak == 1 ? '' : 's'}',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E4976),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E4976).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'Best: $longestStreak',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E4976),
+              ),
+            ),
           ),
         ],
       ),
