@@ -7,7 +7,10 @@ import 'package:tajweed_corrector/models/session_models.dart';
 /// Service for session and progress data
 class SessionService {
   final Dio _dio;
-  static const String _baseUrl = 'http://192.168.100.7:8000';
+  static const String _baseUrl = String.fromEnvironment(
+    'BACKEND_BASE_URL',
+    defaultValue: 'http://192.168.100.7:8000',
+  );
 
   SessionService({Dio? dio})
       : _dio = dio ??

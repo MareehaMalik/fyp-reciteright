@@ -1,0 +1,66 @@
+{
+  "id": "4348dc7b-532b-4e8f-bc82-758bde7395b0",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 1,
+  "mode": "practice",
+  "accuracy_score": 20.0,
+  "whisper_score": 0.0,
+  "mfcc_score": 3.3,
+  "date_time": "2026-04-15T10:16:34.043914Z",
+  "duration_seconds": 16,
+  "mistakes": [
+    {
+      "word": "بِسْمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T10:16:11.484449Z"
+    },
+    {
+      "word": "ٱللَّهِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T10:16:11.484572Z"
+    },
+    {
+      "word": "ٱلرَّحْمَـٰنِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T10:16:11.484618Z"
+    },
+    {
+      "word": "ٱلرَّحِيمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T10:16:11.484663Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 0,
+  "close_words": 0,
+  "missing_words": 4,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001001.mp3",
+  "transcribed_text": "لقد افعلت بشكل دائما تباً لأسفل من أنه تباً",
+  "correct_text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+}

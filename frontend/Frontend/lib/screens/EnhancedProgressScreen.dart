@@ -57,8 +57,21 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
         return;
       }
 
-      final progress = await _sessionService.getUserProgress(userId: user.uid);
-      final memorization = await _sessionService.getMemorizationSummary(userId: user.uid);
+      WeeklyProgressSummary? progress;
+      MemorizationSummary? memorization;
+      final loadErrors = <String>[];
+
+      try {
+        progress = await _sessionService.getUserProgress(userId: user.uid);
+      } catch (e) {
+        loadErrors.add('weekly progress');
+      }
+
+      try {
+        memorization = await _sessionService.getMemorizationSummary(userId: user.uid);
+      } catch (e) {
+        loadErrors.add('memorization');
+      }
 
       final updatedWeekly = {
         'Mon': 0,
@@ -70,22 +83,25 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
         'Sun': 0,
       };
 
-      for (final d in progress.days) {
+      for (final d in (progress?.days ?? const <DailyActivity>[])) {
         updatedWeekly[d.day] = d.sessionCount;
       }
 
       if (!mounted) return;
       setState(() {
-        thisWeekCount = progress.thisWeekCount;
-        averageAccuracy = progress.avgAccuracy;
-        perfectCount = progress.perfectCount;
+        thisWeekCount = progress?.thisWeekCount ?? 0;
+        averageAccuracy = progress?.avgAccuracy ?? 0;
+        perfectCount = progress?.perfectCount ?? 0;
         weeklyActivity
           ..clear()
           ..addAll(updatedWeekly);
-        recentRecitations = progress.recentRecitations;
-        memorizationOverall = memorization.overallPercent;
-        topSurahs = memorization.surahSummaries;
+        recentRecitations = progress?.recentRecitations ?? const [];
+        memorizationOverall = memorization?.overallPercent ?? 0.0;
+        topSurahs = memorization?.surahSummaries ?? const [];
         isLoading = false;
+        errorText = loadErrors.isEmpty
+            ? null
+            : 'Could not load ${loadErrors.join(' & ')}. Pull to refresh.';
       });
     } catch (e) {
       if (!mounted) return;
@@ -241,17 +257,34 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _dayBar('Mon', weeklyActivity['Mon'] ?? 0),
-              _dayBar('Tue', weeklyActivity['Tue'] ?? 0),
-              _dayBar('Wed', weeklyActivity['Wed'] ?? 0),
-              _dayBar('Thu', weeklyActivity['Thu'] ?? 0),
-              _dayBar('Fri', weeklyActivity['Fri'] ?? 0),
-              _dayBar('Sat', weeklyActivity['Sat'] ?? 0),
-              _dayBar('Sun', weeklyActivity['Sun'] ?? 0),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 390;
+              final days = [
+                {'day': 'Mon', 'value': weeklyActivity['Mon'] ?? 0},
+                {'day': 'Tue', 'value': weeklyActivity['Tue'] ?? 0},
+                {'day': 'Wed', 'value': weeklyActivity['Wed'] ?? 0},
+                {'day': 'Thu', 'value': weeklyActivity['Thu'] ?? 0},
+                {'day': 'Fri', 'value': weeklyActivity['Fri'] ?? 0},
+                {'day': 'Sat', 'value': weeklyActivity['Sat'] ?? 0},
+                {'day': 'Sun', 'value': weeklyActivity['Sun'] ?? 0},
+              ];
+
+              return Row(
+                children: days.map((entry) {
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
+                      child: _dayBar(
+                        entry['day'] as String,
+                        entry['value'] as int,
+                        compact: compact,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),
@@ -354,13 +387,13 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
     );
   }
 
-  Widget _dayBar(String day, int value) {
+  Widget _dayBar(String day, int value, {bool compact = false}) {
     final hasValue = value > 0;
     return Column(
       children: [
         Container(
-          width: 56,
-          height: 18,
+          width: double.infinity,
+          height: compact ? 16 : 18,
           decoration: BoxDecoration(
             color: hasValue ? const Color(0xFF1E4976) : Colors.grey[300],
             borderRadius: BorderRadius.circular(6),
@@ -369,19 +402,19 @@ class _EnhancedProgressScreenState extends State<EnhancedProgressScreen> {
           child: hasValue
               ? Text(
                   '$value',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: compact ? 9 : 10,
                     fontWeight: FontWeight.w700,
                   ),
                 )
               : null,
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: compact ? 3 : 4),
         Text(
           day,
-          style: const TextStyle(
-            fontSize: 11,
+          style: TextStyle(
+            fontSize: compact ? 10 : 11,
             color: Colors.grey,
             fontWeight: FontWeight.w500,
           ),

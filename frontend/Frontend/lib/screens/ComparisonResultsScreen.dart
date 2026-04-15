@@ -35,6 +35,7 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
   late AudioPlayer _qariPlayer;
   final SessionService _sessionService = SessionService();
   bool _sessionSaved = false;
+  String? _memorizationStatus;
   bool isPlayingUser = false;
   bool isPlayingQari = false;
 
@@ -132,7 +133,7 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
       );
 
       if (widget.recitationMode == 'memorization') {
-        await _sessionService.updateMemorization(
+        final updatedItem = await _sessionService.updateMemorization(
           userId: user.uid,
           surah: widget.surah,
           ayah: widget.verse,
@@ -143,11 +144,42 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
           whisperScore: (metrics['whisper_score'] as num?)?.toDouble(),
           mfccScore: (metrics['mfcc_score'] as num?)?.toDouble(),
         );
+        if (mounted) {
+          setState(() {
+            _memorizationStatus = updatedItem.status;
+          });
+        }
       }
 
       _sessionSaved = true;
     } catch (_) {
       // Non-blocking: UI should still display compare result even if metrics save fails.
+    }
+  }
+
+  String _memorizationStatusLabel(String status) {
+    switch (status) {
+      case 'memorized':
+        return 'Memorized';
+      case 'learning':
+        return 'Learning';
+      case 'needs_review':
+        return 'Needs review';
+      default:
+        return 'Not started';
+    }
+  }
+
+  Color _memorizationStatusColor(String status) {
+    switch (status) {
+      case 'memorized':
+        return const Color(0xFF2E7D32);
+      case 'learning':
+        return const Color(0xFF1565C0);
+      case 'needs_review':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF757575);
     }
   }
 
@@ -280,8 +312,24 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
 
     // Extract metrics breakdown
     final metrics = widget.comparisonResult['metrics'] as Map<String, dynamic>? ?? {};
+    final hybrid = widget.comparisonResult['hybrid_scoring'] as Map<String, dynamic>? ?? {};
     final whisperScore = (metrics['whisper_score'] as num?)?.toDouble() ?? 0.0;
-    final dtwScore = (metrics['dtw_score'] as num?)?.toDouble() ?? 0.0;
+    final dtwScore =
+        (metrics['dtw_score'] as num?)?.toDouble() ??
+        (hybrid['dtw_score'] as num?)?.toDouble() ??
+        0.0;
+    final directPhonemeScore =
+        (metrics['direct_phoneme_score'] as num?)?.toDouble() ??
+        (hybrid['direct_phoneme_score'] as num?)?.toDouble() ??
+        0.0;
+    final phonemeAccuracyScore =
+        (metrics['phoneme_accuracy_score'] as num?)?.toDouble() ??
+        (hybrid['phoneme_accuracy_score'] as num?)?.toDouble() ??
+        0.0;
+    final tajweedTimingScore =
+        (metrics['tajweed_timing_score'] as num?)?.toDouble() ??
+        (hybrid['tajweed_timing_score'] as num?)?.toDouble() ??
+        0.0;
     final mfccScore = (metrics['mfcc_score'] as num?)?.toDouble() ?? 0.0;
 
     // Extract word results and tajweed summary if available
@@ -369,6 +417,35 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
 
             const SizedBox(height: 24),
 
+            if (widget.recitationMode == 'memorization' && _memorizationStatus != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _memorizationStatusColor(_memorizationStatus!).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _memorizationStatusColor(_memorizationStatus!)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_stories, color: _memorizationStatusColor(_memorizationStatus!)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Memorization status for this ayah: ${_memorizationStatusLabel(_memorizationStatus!)}',
+                        style: TextStyle(
+                          color: _memorizationStatusColor(_memorizationStatus!),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (widget.recitationMode == 'memorization' && _memorizationStatus != null)
+              const SizedBox(height: 24),
+
             // ─────────────────────────────────────────
             // SECTION 2: Feedback
             // ─────────────────────────────────────────
@@ -437,28 +514,49 @@ class _ComparisonResultsScreenState extends State<ComparisonResultsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Whisper Score (Word Accuracy - 70% weight)
+                  // Word accuracy from ASR alignment (diagnostic)
                   _buildMetricRow(
                     'Word Accuracy (Whisper)',
                     whisperScore,
-                    '70%',
+                    'Diagnostic',
                     Colors.blue,
                   ),
                   const SizedBox(height: 12),
-                  // MFCC Score (Audio Features - 30% weight)
+                  // MFCC timbre/energy similarity (Hybrid audio component)
                   _buildMetricRow(
                     'Audio Features (MFCC)',
                     mfccScore,
-                    '30%',
+                    '20%',
                     Colors.purple,
                   ),
                   const SizedBox(height: 12),
-                  // DTW Score (Dynamic Time Warping)
+                  // DTW timing and phonetic-shape similarity
                   _buildMetricRow(
                     'Dynamic Time Warping (DTW)',
                     dtwScore,
-                    'Reference',
+                    'Phoneme Subscore',
                     Colors.orange,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMetricRow(
+                    'Direct Phoneme Match',
+                    directPhonemeScore,
+                    'Phoneme Subscore',
+                    const Color(0xFF00897B),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMetricRow(
+                    'Hybrid Phoneme Accuracy',
+                    phonemeAccuracyScore,
+                    '60%',
+                    const Color(0xFF3949AB),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMetricRow(
+                    'Tajweed Timing',
+                    tajweedTimingScore,
+                    '20%',
+                    const Color(0xFF6D4C41),
                   ),
                 ],
               ),

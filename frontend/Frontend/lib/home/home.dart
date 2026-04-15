@@ -24,10 +24,9 @@ class ReciteRightScreen extends StatefulWidget {
 class _ReciteRightScreenState extends State<ReciteRightScreen> {
   int _currentIndex = 0;
   String _userName = 'User';
-  String? _userAvatar; // Add avatar state
+  String? _userAvatar;
   final UserService _userService = UserService();
 
-  // Helper function for slide transition
   PageRouteBuilder _createSlideRoute(Widget page) {
     return PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 300),
@@ -46,62 +45,47 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
   void initState() {
     super.initState();
     _loadUserName();
-    // Initialize sample lessons after user is authenticated
     _initializeLessons();
   }
 
   Future<void> _loadUserName() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      print('🔍 Loading username for user: ${user?.email}');
-      
       if (user == null) {
-        print('❌ No user logged in');
         setState(() => _userName = 'Guest');
         return;
       }
-      
+
       final profile = await _userService.getUserProfile();
-      print('📋 Profile loaded: $profile');
-      
+
       String? fullName = profile?['fullName'];
-      
-      // If profile has the default "Google User" name, replace it with email username
+
       if (fullName == 'Google User') {
-        print('ℹ️ Updating default "Google User" name');
         fullName = user.displayName ?? user.email?.split('@')[0] ?? 'User';
-        
-        // Update the profile in Firestore
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .update({
-              'fullName': fullName,
-              'updatedAt': DateTime.now(),
-            });
-        print('✅ Profile name updated to: $fullName');
+          'fullName': fullName,
+          'updatedAt': DateTime.now(),
+        });
       }
-      
-      // If no profile exists, create one with default values
+
       if (profile == null || fullName == null) {
-        print('ℹ️ No profile found, creating default profile');
         fullName = user.displayName ?? user.email?.split('@')[0] ?? 'User';
-        
-        // Create user profile in Firestore
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .set({
-              'fullName': fullName,
-              'email': user.email,
-              'createdAt': DateTime.now(),
-              'avatarUrl': null,
-            }, SetOptions(merge: true));
-        print('✅ Default profile created with name: $fullName');
+          'fullName': fullName,
+          'email': user.email,
+          'createdAt': DateTime.now(),
+          'avatarUrl': null,
+        }, SetOptions(merge: true));
       }
-      
-      print('✅ User name loaded: $fullName');
-      
+
       if (mounted) {
         setState(() {
           _userName = fullName ?? 'User';
@@ -109,7 +93,6 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
         });
       }
     } catch (e) {
-      print('❌ Error loading user name: $e');
       setState(() => _userName = 'User');
     }
   }
@@ -125,7 +108,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final contentWidth = constraints.maxWidth > 800 ? 800.0 : constraints.maxWidth;
+            final contentWidth =
+            constraints.maxWidth > 800 ? 800.0 : constraints.maxWidth;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -135,27 +119,27 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top bar
+                      // HEADER – matches original design
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
+                        children: const [
+                          Text(
                             "ReciteRight",
                             style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
                               color: Color(0xFF1E4976),
                             ),
                           ),
-                          const ThemeToggleButton(
+                          Icon(
+                            Icons.dark_mode,
                             color: Color(0xFF1E4976),
-                            size: 28,
+                            size: 30,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
 
-                      // Greeting card with animation
                       SlideInWidget(
                         beginOffset: const Offset(0, 0.3),
                         duration: const Duration(milliseconds: 600),
@@ -163,85 +147,102 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
                           child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Assalam-o-Alaikum,",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  Text(
-                                    _userName,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      color: Color(0xFF1E4976),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    "😊 Are you ready to recite?",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(
-                              width: 50,
-                              height: 50,
-                              child: ClipOval(
-                                child: _userAvatar != null && _userAvatar!.isNotEmpty
-                                    ? Image.asset(
-                                        _userAvatar!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            color: const Color(0xFF2E5F8F),
-                                            child: const Icon(
-                                              Icons.person,
-                                              color: Colors.white,
-                                              size: 28,
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : Container(
-                                        color: const Color(0xFF2E5F8F),
-                                        child: const Icon(
-                                          Icons.person,
-                                          color: Colors.white,
-                                          size: 28,
-                                        ),
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Assalam-o-Alaikum,",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey,
                                       ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _userName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        color: Color(0xFF1E4976),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      "😊 Are you ready to recite?",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 16),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    _createSlideRoute(const ProfileScreen()),
+                                  );
+                                },
+                                child: SizedBox(
+                                  width: 64,
+                                  height: 64,
+                                  child: ClipOval(
+                                    child: _userAvatar != null &&
+                                        _userAvatar!.isNotEmpty
+                                        ? Image.asset(
+                                      _userAvatar!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error,
+                                          stackTrace) {
+                                        return Container(
+                                          color:
+                                          const Color(0xFF2E5F8F),
+                                          child: const Icon(
+                                            Icons.person,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                        : Container(
+                                      color: const Color(0xFF2E5F8F),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      // Feature cards row - matching design
+                      // Feature cards row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -250,7 +251,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const EnhancedReciteScreen(),
+                                  builder: (context) =>
+                                  const EnhancedReciteScreen(),
                                 ),
                               );
                             },
@@ -265,7 +267,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const TajweedLessonsScreen(),
+                                  builder: (context) =>
+                                  const TajweedLessonsScreen(),
                                 ),
                               );
                             },
@@ -280,7 +283,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const EnhancedProgressScreen(),
+                                  builder: (context) =>
+                                  const EnhancedProgressScreen(),
                                 ),
                               );
                             },
@@ -290,7 +294,7 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Stats Button
+                      // Stats button
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -313,7 +317,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1E4976).withOpacity(0.1),
+                                  color:
+                                  const Color(0xFF1E4976).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -364,7 +369,7 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
+                              color: Colors.black.withOpacity(0.06),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -428,7 +433,7 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Listen section with avatars
+                      // Listen section
                       Row(
                         children: [
                           SizedBox(
@@ -448,7 +453,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                                           fit: BoxFit.cover,
                                           width: 36,
                                           height: 36,
-                                          errorBuilder: (context, error, stackTrace) {
+                                          errorBuilder: (context, error,
+                                              stackTrace) {
                                             return Container(
                                               color: Colors.grey.shade200,
                                               child: const Icon(
@@ -493,7 +499,8 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const QariListenScreen(),
+                                  builder: (context) =>
+                                  const QariListenScreen(),
                                 ),
                               );
                             },
@@ -520,18 +527,26 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
           },
         ),
       ),
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
           if (index == 0) {
             setState(() => _currentIndex = 0);
           } else if (index == 1) {
-            Navigator.push(context, _createSlideRoute(const TajweedLessonsScreen()));
+            Navigator.push(
+              context,
+              _createSlideRoute(const TajweedLessonsScreen()),
+            );
           } else if (index == 2) {
-            Navigator.push(context, _createSlideRoute(const AudioLessonsScreen()));
+            Navigator.push(
+              context,
+              _createSlideRoute(const AudioLessonsScreen()),
+            );
           } else if (index == 3) {
-            Navigator.push(context, _createSlideRoute(const ProfileScreen()));
+            Navigator.push(
+              context,
+              _createSlideRoute(const ProfileScreen()),
+            );
           }
         },
         type: BottomNavigationBarType.fixed,
@@ -584,7 +599,7 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -639,7 +654,10 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
       ),
       child: Column(
         children: [
-          const Text("Progress", style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text(
+            "Progress",
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 8),
           Stack(
             alignment: Alignment.center,
@@ -664,5 +682,3 @@ class _ReciteRightScreenState extends State<ReciteRightScreen> {
     );
   }
 }
-
-

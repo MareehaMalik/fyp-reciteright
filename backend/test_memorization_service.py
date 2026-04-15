@@ -99,6 +99,7 @@ class TestMemorizationSummary(unittest.TestCase):
         items = [
             MemorizationItem(user_id='u1', surah_number=1, ayah_number=1, status='memorized'),
             MemorizationItem(user_id='u1', surah_number=1, ayah_number=2, status='learning'),
+            MemorizationItem(user_id='u1', surah_number=1, ayah_number=3, status='needs_review'),
             MemorizationItem(user_id='u1', surah_number=112, ayah_number=1, status='memorized'),
             MemorizationItem(user_id='u1', surah_number=112, ayah_number=2, status='memorized'),
         ]
@@ -109,7 +110,12 @@ class TestMemorizationSummary(unittest.TestCase):
 
         s1 = next(s for s in summary.surah_summaries if s.surah_number == 1)
         self.assertEqual(s1.memorized_ayahs, 1)
+        self.assertEqual(s1.learning_ayahs, 1)
+        self.assertEqual(s1.needs_review_ayahs, 1)
         self.assertEqual(s1.total_ayahs, 7)
+        self.assertEqual(summary.total_memorized, 3)
+        self.assertEqual(summary.total_learning, 1)
+        self.assertEqual(summary.total_needs_review, 1)
 
 
 class TestMemorizationRecommendations(unittest.TestCase):

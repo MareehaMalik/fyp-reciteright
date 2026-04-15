@@ -14,10 +14,15 @@
         "session_id": "449c62b1-7366-4101-b813-79b9c78eab8f",
         "score": 41.1,
         "recorded_at": "2026-04-14T09:10:48.848554Z"
+      },
+      {
+        "session_id": "f607b62c-4fba-45fd-bff8-f5aa63f640bb",
+        "score": 46.6,
+        "recorded_at": "2026-04-14T16:25:48.556036Z"
       }
     ],
-    "timesRecited": 2,
-    "lastRecitedAt": "2026-04-14T09:10:48.848554Z",
+    "timesRecited": 3,
+    "lastRecitedAt": "2026-04-14T16:25:48.556036Z",
     "lastStatusChangeAt": "2026-04-14T09:09:26.372973Z"
   },
   {
@@ -30,10 +35,15 @@
         "session_id": "4ea0bee0-c404-47e4-92ad-793a9fd468bb",
         "score": 36.9,
         "recorded_at": "2026-04-14T09:11:59.280236Z"
+      },
+      {
+        "session_id": "0f7a6207-bfee-4b55-9486-0cd6ca0d2abd",
+        "score": 36.9,
+        "recorded_at": "2026-04-14T16:10:32.964887Z"
       }
     ],
-    "timesRecited": 1,
-    "lastRecitedAt": "2026-04-14T09:11:59.280236Z",
+    "timesRecited": 2,
+    "lastRecitedAt": "2026-04-14T16:10:32.964887Z",
     "lastStatusChangeAt": "2026-04-14T09:11:59.280236Z"
   }
 ]

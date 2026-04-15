@@ -12,5 +12,12 @@
     "ayah_count_memorized": 0,
     "last_reviewed_at": null,
     "high_accuracy_sessions": {}
+  },
+  "2": {
+    "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+    "surah": 2,
+    "ayah_count_memorized": 0,
+    "last_reviewed_at": null,
+    "high_accuracy_sessions": {}
   }
 }

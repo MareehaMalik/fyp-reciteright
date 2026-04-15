@@ -56,6 +56,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '✨',
       'title': 'Tajweed: Ghunnah',
+      'action': 'lesson',
       'description': 'Master the nasalization rule',
       'duration': '3 min',
       'level': 'Beginner',
@@ -64,6 +65,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '🔄',
       'title': 'Review Mistakes',
+      'action': 'mistakes',
       'description': '3 words from yesterday',
       'duration': '5 min',
       'level': 'Intermediate',
@@ -72,6 +74,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '📚',
       'title': 'Memorize Today',
+      'action': 'memorization',
       'description': 'Surah Al-Ikhlas (2 ayahs)',
       'duration': '7 min',
       'level': 'Advanced',
@@ -80,6 +83,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '⚡',
       'title': 'Fluency Check',
+      'action': 'lesson',
       'description': 'Quick 1-minute practice',
       'duration': '1 min',
       'level': 'Beginner',
@@ -127,7 +131,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       final profile = await _userService.getUserProfile();
       String fullName =
           profile?['fullName'] ?? user.displayName ?? 'User';
-      String? avatarUrl = profile?['avatarUrl'];
+      String? avatarUrl = profile?['avatarUrl'] ?? user.photoURL;
 
       setState(() {
         _userName = fullName;
@@ -239,8 +243,10 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               final item = _todayItems[index];
               return GestureDetector(
                 onTap: () {
+                  final action = (item['action'] ?? '').toString().toLowerCase();
                   final title = (item['title'] ?? '').toString().toLowerCase();
-                  if (title.contains('memorize') || title.contains('memorization')) {
+
+                  if (action == 'memorization' || title.contains('memorize') || title.contains('memorization')) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -250,7 +256,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                     return;
                   }
 
-                  if (title.contains('mistake')) {
+                  if (action == 'mistakes' || title.contains('mistake')) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -515,107 +521,139 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
   // HEADER - Keep existing design
   Widget _buildHeader(bool isDark) {
-    final cardColor = isDark ? const Color(0xFF2d2d2d) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1E4976);
     final subtextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    final cardColor = isDark ? const Color(0xFF2d2d2d) : Colors.white;
 
-    return Container(
-      color: isDark ? const Color(0xFF2d2d2d) : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: Logo + Avatar + Theme toggle
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // App name
               Text(
                 'ReciteRight',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w800,
                   color: textColor,
+                  height: 1.0,
                 ),
               ),
-
-              // Avatar + Theme Toggle
-              Row(
+              IconButton(
+                tooltip: 'Toggle theme',
+                onPressed: _toggleTheme,
+                icon: Icon(
+                  _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                  color: textColor,
+                  size: 34,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
                 children: [
-                  // Theme toggle
-                  GestureDetector(
-                    onTap: _toggleTheme,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF444444)
-                            : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                        size: 20,
-                        color: textColor,
-                      ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Assalam-o-Alaikum,',
+                          style: TextStyle(
+                            fontSize: 21,
+                            color: subtextColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _userName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 30,
+                            color: textColor,
+                            fontWeight: FontWeight.w800,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '😊 Are you ready to recite?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: subtextColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-
-                  // Profile Avatar
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
-                      );
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1E4976),
-                        border: Border.all(
-                          color: textColor.withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: _userAvatar != null
-                          ? ClipOval(
-                              child: Image.network(
-                                _userAvatar!,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Center(
+                  const SizedBox(width: 14),
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E4976).withValues(alpha: 0.08),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _userAvatar != null && _userAvatar!.isNotEmpty
+                        ? Image.network(
+                            _userAvatar!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
                               child: Text(
                                 _userName.isNotEmpty
                                     ? _userName[0].toUpperCase()
                                     : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: textColor,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 18,
+                                  fontSize: 36,
                                 ),
                               ),
                             ),
-                    ),
+                          )
+                        : Center(
+                            child: Text(
+                              _userName.isNotEmpty
+                                  ? _userName[0].toUpperCase()
+                                  : 'U',
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 36,
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Greeting text
-          Text(
-            'Assalam-o-Alaikum, $_userName 👋',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: textColor,
             ),
           ),
         ],

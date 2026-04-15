@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tajweed_corrector/services/user_service.dart';
-import 'package:tajweed_corrector/services/stats_service.dart';
+import 'package:tajweed_corrector/services/session_service.dart';
 import 'ProfileScreen.dart';
 import 'EnhancedReciteScreen.dart';
 import 'TajweedLessonsScreen.dart';
@@ -9,6 +9,7 @@ import 'EnhancedProgressScreen.dart';
 import 'SurahListScreen.dart';
 import 'package:tajweed_corrector/screens/MistakesScreen.dart';
 import 'package:tajweed_corrector/screens/MemorizationScreen.dart';
+import 'package:tajweed_corrector/screens/AlphabetHomeScreen.dart';
 
 class NewHomeScreen extends StatefulWidget {
   const NewHomeScreen({super.key});
@@ -20,7 +21,7 @@ class NewHomeScreen extends StatefulWidget {
 class _NewHomeScreenState extends State<NewHomeScreen>
     with TickerProviderStateMixin {
   late UserService _userService;
-  late StatsService _statsService;
+  late SessionService _sessionService;
   late PageController _carouselController;
 
   // User Data
@@ -45,6 +46,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '✨',
       'title': 'Tajweed: Ghunnah',
+      'action': 'lesson',
       'description': 'Master the nasalization rule',
       'duration': '3 min',
       'level': 'Beginner',
@@ -54,6 +56,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '🔄',
       'title': 'Review Mistakes',
+      'action': 'mistakes',
       'description': '3 words from yesterday',
       'duration': '5 min',
       'level': 'Intermediate',
@@ -63,6 +66,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '📚',
       'title': 'Memorize Today',
+      'action': 'memorization',
       'description': 'Surah Al-Ikhlas (2 ayahs)',
       'duration': '7 min',
       'level': 'Advanced',
@@ -72,6 +76,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     {
       'icon': '⚡',
       'title': 'Fluency Check',
+      'action': 'lesson',
       'description': 'Quick 1-minute practice',
       'duration': '1 min',
       'level': 'Beginner',
@@ -84,7 +89,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
   void initState() {
     super.initState();
     _userService = UserService();
-    _statsService = StatsService();
+    _sessionService = SessionService();
     _carouselController = PageController(viewportFraction: 0.85);
     _loadUserData();
     _loadProgressData();
@@ -105,9 +110,33 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       }
 
       final profile = await _userService.getUserProfile();
-      String fullName =
-          profile?['fullName'] ?? user.displayName ?? 'User';
-      String? avatarUrl = profile?['avatarUrl'];
+      String fullName = profile?['fullName'] ?? user.displayName ?? 'User';
+      
+      // Try multiple sources for avatar - check all possible field names
+      String? avatarUrl;
+      
+      // 1. Try profile collection with all possible field names
+      if (profile != null) {
+        avatarUrl = (profile['profileImageUrl'] ?? 
+                     profile['avatarUrl'] ?? 
+                     profile['photoUrl'] ?? 
+                     profile['photoURL'] ??
+                     profile['avatar'])?.toString();
+      }
+      
+      // 2. Try Firebase auth photo URL if no profile image
+      if ((avatarUrl ?? '').isEmpty) {
+        avatarUrl = user.photoURL;
+      }
+      
+      // Clean up the URL - ensure it's not empty
+      if (avatarUrl != null && avatarUrl.trim().isEmpty) {
+        avatarUrl = null;
+      }
+
+      print('DEBUG: User avatar URL = $avatarUrl');
+      print('DEBUG: User full name = $fullName');
+      print('DEBUG: User profile data = $profile');
 
       setState(() {
         _userName = fullName;
@@ -120,13 +149,32 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
   Future<void> _loadProgressData() async {
     try {
-      final weeklyStats = await _statsService.getWeeklyStats();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final homeMetrics = await _sessionService.getHomeMetrics(userId: user.uid);
       setState(() {
-        _currentStreak = weeklyStats.longestStreak;
-        _dailyMinutesCompleted = (weeklyStats.totalRecitations * 5).toInt();
+        _currentStreak = homeMetrics.currentStreak;
+        _dailyMinutesCompleted = homeMetrics.todayMinutes;
+        if (homeMetrics.lastSessionDate != null &&
+            homeMetrics.lastSessionDate!.isNotEmpty) {
+          _lastRecitedTime = _formatDaysAgo(homeMetrics.lastSessionDate!);
+        }
       });
     } catch (e) {
       print('Error loading progress data: $e');
+    }
+  }
+
+  String _formatDaysAgo(String yyyyMmDd) {
+    try {
+      final sessionDate = DateTime.parse(yyyyMmDd);
+      final diff = DateTime.now().difference(sessionDate).inDays;
+      if (diff <= 0) return 'today';
+      if (diff == 1) return '1 day ago';
+      return '$diff days ago';
+    } catch (_) {
+      return 'recently';
     }
   }
 
@@ -161,7 +209,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // HEADER (Keep existing)
+              // HEADER
               _buildHeader(isDark),
 
               // GAMIFIED DASHBOARD CONTENT
@@ -204,111 +252,177 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
   // ========== COMPONENTS ==========
 
-  Widget _buildHeader(bool isDark) {
-    final textColor = isDark ? Colors.white : const Color(0xFF1E4976);
+  Widget _buildAvatarImage() {
+    // No avatar at all → fallback with initials
+    if (_userAvatar == null || _userAvatar!.trim().isEmpty) {
+      return _avatarFallback();
+    }
+
+    final String avatar = _userAvatar!.trim();
+
+    // Decide based on scheme
+    final bool isNetworkUrl =
+        avatar.startsWith('http://') || avatar.startsWith('https://');
+
+    if (isNetworkUrl) {
+      print('Loading network avatar: $avatar');
+      // Avatar from Firebase / web url
+      return Image.network(
+        avatar,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network avatar: $error');
+          return _avatarFallback();
+        },
+      );
+    } else {
+      print('Loading asset avatar: $avatar');
+      // Avatar from bundled assets (e.g assets/avatar.png)
+      return Image.asset(
+        avatar,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading asset avatar: $error');
+          return _avatarFallback();
+        },
+      );
+    }
+  }
+
+  Widget _avatarFallback() {
+    final String initials = _extractInitials(_userName);
 
     return Container(
-      color: isDark ? const Color(0xFF2d2d2d) : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: const Color(0xFF2E5F8F),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  String _extractInitials(String name) {
+    if (name.isEmpty) return 'U';
+    
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    
+    // Get first letter of first and last name
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  Widget _buildHeader(bool isDark) {
+    final cardColor = isDark ? const Color(0xFF2A2A30) : Colors.white;
+    final titleColor = isDark ? Colors.white : const Color(0xFF1E4976);
+    final subtextColor = isDark ? const Color(0xFFB0B5C0) : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // App name + dark mode toggle
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'ReciteRight',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: titleColor,
                 ),
               ),
-              Row(
+              GestureDetector(
+                onTap: _toggleTheme,
+                child: Icon(
+                  _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                  color: titleColor,
+                  size: 30,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Greeting card — full card tappable to Profile
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              padding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: _toggleTheme,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF444444)
-                            : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                        size: 20,
-                        color: textColor,
-                      ),
+                  // Text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Assalam-o-Alaikum,',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: subtextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _userName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '😊 Are you ready to recite?',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: subtextColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
-                      );
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1E4976),
-                        border: Border.all(
-                          color: textColor.withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: _userAvatar != null
-                          ? ClipOval(
-                              child: Image.network(
-                                _userAvatar!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Center(
-                                    child: Text(
-                                      _userName.isNotEmpty
-                                          ? _userName[0].toUpperCase()
-                                          : 'U',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          : Center(
-                              child: Text(
-                                _userName.isNotEmpty
-                                    ? _userName[0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
+                  const SizedBox(width: 16),
+
+                  // Avatar
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: ClipOval(
+                      child: _buildAvatarImage(),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Assalam-o-Alaikum, $_userName 👋',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: textColor,
             ),
           ),
         ],
@@ -317,21 +431,19 @@ class _NewHomeScreenState extends State<NewHomeScreen>
   }
 
   Widget _buildHeroCard(bool isDark) {
-    final textColor = isDark ? Colors.white : const Color(0xFF1E4976);
-
     return Container(
       decoration: BoxDecoration(
         gradient: _isNewUser
             ? const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        )
             : const LinearGradient(
-                colors: [Color(0xFF1E4976), Color(0xFF2E5F8F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+          colors: [Color(0xFF1E4976), Color(0xFF2E5F8F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -366,10 +478,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             const SizedBox(height: 8),
             const Text(
               'Join thousands learning Tajweed the fun way',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 13),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -421,10 +530,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             const SizedBox(height: 4),
             Text(
               'Last recited $_lastRecitedTime',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -487,8 +593,8 @@ class _NewHomeScreenState extends State<NewHomeScreen>
     final cardColor = isDark ? const Color(0xFF2d2d2d) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1E4976);
     final subtextColor = isDark ? Colors.grey[400] : Colors.grey[600];
-
-    final progressPercent = (_dailyMinutesCompleted / _dailyGoalMinutes).clamp(0.0, 1.0);
+    final progressPercent =
+    (_dailyMinutesCompleted / _dailyGoalMinutes).clamp(0.0, 1.0);
 
     return GestureDetector(
       onTap: () {
@@ -518,13 +624,13 @@ class _NewHomeScreenState extends State<NewHomeScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Left: Daily Progress Ring
+            // Daily Progress Ring
             Column(
               children: [
                 SizedBox(
                   width: 80,
                   height: 80,
-                  child: _buildProgressRing(progressPercent, textColor, isDark),
+                  child: _buildProgressRing(progressPercent, textColor!, isDark),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -538,7 +644,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               ],
             ),
 
-            // Center: Streak
+            // Streak
             Column(
               children: [
                 const Text('🔥', style: TextStyle(fontSize: 32)),
@@ -563,12 +669,12 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               ],
             ),
 
-            // Right: Level Badge
+            // Level Badge
             Column(
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E4976).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -623,21 +729,15 @@ class _NewHomeScreenState extends State<NewHomeScreen>
           value: progress,
           strokeWidth: 3,
           valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-          backgroundColor:
-              isDark ? Colors.grey[800] : Colors.grey[300],
+          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
         ),
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${(progress * 100).toInt()}%',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
-          ],
+        Text(
+          '${(progress * 100).toInt()}%',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
         ),
       ],
     );
@@ -703,13 +803,10 @@ class _NewHomeScreenState extends State<NewHomeScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  item['icon'],
-                  style: const TextStyle(fontSize: 28),
-                ),
+                Text(item['icon'], style: const TextStyle(fontSize: 28)),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: item['bgColor'],
                     borderRadius: BorderRadius.circular(12),
@@ -753,9 +850,9 @@ class _NewHomeScreenState extends State<NewHomeScreen>
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: item['color'].withOpacity(0.1),
+                    color: (item['color'] as Color).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -772,8 +869,13 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                   width: 80,
                   child: ElevatedButton(
                     onPressed: () {
-                      final title = (item['title'] ?? '').toString().toLowerCase();
-                      if (title.contains('mistake')) {
+                      final action =
+                      (item['action'] ?? '').toString().toLowerCase();
+                      final title =
+                      (item['title'] ?? '').toString().toLowerCase();
+
+                      if (action == 'mistakes' ||
+                          title.contains('mistake')) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -783,7 +885,9 @@ class _NewHomeScreenState extends State<NewHomeScreen>
                         return;
                       }
 
-                      if (title.contains('memorize') || title.contains('memorization')) {
+                      if (action == 'memorization' ||
+                          title.contains('memorize') ||
+                          title.contains('memorization')) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -828,25 +932,44 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
   Widget _buildQuickActionsRow(bool isDark) {
     final quickActions = [
-      {'label': 'Browse\nSurahs', 'icon': Icons.library_books, 'color': const Color(0xFF2196F3)},
-      {'label': 'Tajweed\nLibrary', 'icon': Icons.school, 'color': const Color(0xFF673AB7)},
-      {'label': 'My\nRecordings', 'icon': Icons.mic, 'color': const Color(0xFF009688)},
-      {'label': 'My\nMistakes', 'icon': Icons.bug_report, 'color': const Color(0xFFE91E63)},
+      {
+        'label': 'Arabic\nAlphabet',
+        'icon': Icons.grid_view_rounded,
+        'color': const Color(0xFF1E4976)
+      },
+      {
+        'label': 'Browse\nSurahs',
+        'icon': Icons.library_books,
+        'color': const Color(0xFF2196F3)
+      },
+      {
+        'label': 'Tajweed\nLibrary',
+        'icon': Icons.school,
+        'color': const Color(0xFF673AB7)
+      },
+      {
+        'label': 'My\nRecordings',
+        'icon': Icons.mic,
+        'color': const Color(0xFF009688)
+      },
+      {
+        'label': 'My\nMistakes',
+        'icon': Icons.bug_report,
+        'color': const Color(0xFFE91E63)
+      },
     ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(
-          quickActions.length,
-          (index) {
-            final action = quickActions[index];
-            return Padding(
-              padding: EdgeInsets.only(right: index < quickActions.length - 1 ? 12 : 0),
-              child: _buildQuickActionPill(action, isDark),
-            );
-          },
-        ),
+        children: List.generate(quickActions.length, (index) {
+          final action = quickActions[index];
+          return Padding(
+            padding: EdgeInsets.only(
+                right: index < quickActions.length - 1 ? 12 : 0),
+            child: _buildQuickActionPill(action, isDark),
+          );
+        }),
       ),
     );
   }
@@ -857,28 +980,27 @@ class _NewHomeScreenState extends State<NewHomeScreen>
 
     return GestureDetector(
       onTap: () {
-        // Handle quick action tap
-        if (action['label'].contains('Browse')) {
+        if ((action['label'] as String).contains('Alphabet')) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const SurahListScreen()),
+            MaterialPageRoute(builder: (context) => const AlphabetHomeScreen()),
           );
-        } else if (action['label'].contains('Tajweed')) {
+        } else if ((action['label'] as String).contains('Browse')) {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => const SurahListScreen()));
+        } else if ((action['label'] as String).contains('Tajweed')) {
           Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const TajweedLessonsScreen()),
-          );
-        } else if (action['label'].contains('Mistakes')) {
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const TajweedLessonsScreen()));
+        } else if ((action['label'] as String).contains('Mistakes')) {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => const MistakesScreen()));
+        } else if ((action['label'] as String).contains('Recordings')) {
           Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MistakesScreen()),
-          );
-        } else if (action['label'].contains('Recordings')) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const EnhancedProgressScreen()),
-          );
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const EnhancedProgressScreen()));
         }
       },
       child: Container(
@@ -893,10 +1015,10 @@ class _NewHomeScreenState extends State<NewHomeScreen>
         ),
         child: Column(
           children: [
-            Icon(action['icon'], color: color, size: 24),
+            Icon(action['icon'] as IconData, color: color, size: 24),
             const SizedBox(height: 6),
             Text(
-              action['label'],
+              action['label'] as String,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10,
@@ -922,7 +1044,8 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
         BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Lessons'),
-        BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: 'Progress'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.trending_up), label: 'Progress'),
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
       ],
       onTap: (index) {
@@ -946,8 +1069,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
           case 3:
             Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (context) => const ProfileScreen()),
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
             );
             break;
         }

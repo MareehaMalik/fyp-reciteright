@@ -20,6 +20,32 @@ class _MemorizationScreenState extends State<MemorizationScreen> {
   MemorizationSummary _summary = MemorizationSummary(overallPercent: 0.0);
   List<MemorizationTodayItem> _todayItems = const [];
 
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'memorized':
+        return 'Memorized';
+      case 'learning':
+        return 'Learning';
+      case 'needs_review':
+        return 'Needs review';
+      default:
+        return 'Not started';
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'memorized':
+        return const Color(0xFF2E7D32);
+      case 'learning':
+        return const Color(0xFF1565C0);
+      case 'needs_review':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF757575);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -149,7 +175,35 @@ class _MemorizationScreenState extends State<MemorizationScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildCountChip('Memorized', _summary.totalMemorized, const Color(0xFF2E7D32)),
+              _buildCountChip('Learning', _summary.totalLearning, const Color(0xFF1565C0)),
+              _buildCountChip('Needs review', _summary.totalNeedsReview, const Color(0xFFE65100)),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCountChip(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: $count',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -246,6 +300,16 @@ class _MemorizationScreenState extends State<MemorizationScreen> {
                 valueColor: const AlwaysStoppedAnimation(Color(0xFF2E7D32)),
               ),
             ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildCountChip('Memorized', surah.memorizedAyahs, const Color(0xFF2E7D32)),
+                _buildCountChip('Learning', surah.learningAyahs, const Color(0xFF1565C0)),
+                _buildCountChip('Needs review', surah.needsReviewAyahs, const Color(0xFFE65100)),
+              ],
+            ),
           ],
         ),
       ),
@@ -253,12 +317,34 @@ class _MemorizationScreenState extends State<MemorizationScreen> {
   }
 
   Widget _buildTodayItem(MemorizationTodayItem item) {
+    final statusColor = _statusColor(item.status);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: const Icon(Icons.auto_stories, color: Color(0xFF1E4976)),
         title: Text('${item.surahName} - Ayah ${item.ayahNumber}'),
-        subtitle: Text('Status: ${item.status} • Recited ${item.timesRecited}x'),
+        subtitle: Row(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                _statusLabel(item.status),
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('Recited ${item.timesRecited}x'),
+          ],
+        ),
         trailing: const Icon(Icons.play_circle_fill, color: Color(0xFF1E4976)),
         onTap: () {
           Navigator.push(

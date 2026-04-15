@@ -44,4 +44,5 @@ flutter:
   assets:
     - assets/
     - assets/Avatars/
-
+    - assets/audio/arabic_alphabet_flat/
+    - assets/audio/arabic_alphabet/

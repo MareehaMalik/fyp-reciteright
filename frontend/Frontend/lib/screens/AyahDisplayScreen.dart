@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:tajweed_corrector/models/memorization_item.dart';
+import 'package:tajweed_corrector/services/backend_config.dart';
+import 'package:tajweed_corrector/services/session_service.dart';
 
 import 'ComparisonResultsScreen.dart';
 import 'package:tajweed_corrector/services/theme_service.dart';
@@ -31,6 +35,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
   final AudioPlayer _player = AudioPlayer();
   final Record _recorder = Record();
   final PageController _cardPageController = PageController();
+  final SessionService _sessionService = SessionService();
 
   final List<Map<String, String>> _qaris = const [
     {'id': '7', 'name': 'Mishary Alafasy', 'folder': 'Alafasy'},
@@ -49,6 +54,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
   bool _isPlayingAudio = false;
   bool _isRecording = false;
   bool _isComparing = false;
+  bool _isLoadingMemorization = false;
 
   bool _repeatCurrentAyah = false;
   bool _autoPlayRange = false;
@@ -76,11 +82,71 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
         'Qari';
   }
 
+  final Map<int, MemorizationItem> _memorizationByAyah = {};
+
+  bool get _isMemorizationMode => widget.recitationMode == 'memorization';
+
+  String _memorizationStatusLabel(String status) {
+    switch (status) {
+      case 'memorized':
+        return 'Memorized';
+      case 'learning':
+        return 'Learning';
+      case 'needs_review':
+        return 'Needs review';
+      default:
+        return 'Not started';
+    }
+  }
+
+  Color _memorizationStatusColor(String status) {
+    switch (status) {
+      case 'memorized':
+        return const Color(0xFF2E7D32);
+      case 'learning':
+        return const Color(0xFF1565C0);
+      case 'needs_review':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF757575);
+    }
+  }
+
+  Future<void> _loadMemorizationStatuses() async {
+    if (!_isMemorizationMode) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final surahNumber = widget.surah['number'];
+    if (surahNumber is! int) return;
+
+    try {
+      setState(() => _isLoadingMemorization = true);
+      final items = await _sessionService.getMemorizationItems(
+        userId: user.uid,
+        surahNumber: surahNumber,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _memorizationByAyah
+          ..clear()
+          ..addEntries(items.map((item) => MapEntry(item.ayahNumber, item)));
+        _isLoadingMemorization = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMemorization = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _setupAudioListeners();
     _fetchAyahs();
+    _loadMemorizationStatuses();
   }
 
   void _setupAudioListeners() {
@@ -320,7 +386,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.100.7:8000/api/compare'),
+        Uri.parse(BackendConfig.compareUrl()),
       );
 
       request.fields['surah'] = widget.surah['number'].toString();
@@ -331,15 +397,29 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
           .add(await http.MultipartFile.fromPath('audio', _recordingPath!));
 
       final response = await request.send().timeout(const Duration(seconds: 60));
-      if (response.statusCode != 200) {
-        throw Exception('Comparison failed: ${response.statusCode}');
+      final body = await response.stream.bytesToString();
+      final result = body.isNotEmpty ? (jsonDecode(body) as Map<String, dynamic>) : <String, dynamic>{};
+
+      if (response.statusCode == 422) {
+        final reason = (result['reason'] ?? '').toString();
+        if (reason == 'no_speech_detected') {
+          _showError('No recitation detected. Recite clearly and try again.');
+        } else if (reason == 'low_transcription_confidence') {
+          _showError('Voice was unclear. Please recite louder and closer to microphone.');
+        } else {
+          _showError((result['error'] ?? 'Comparison rejected. Please try again.').toString());
+        }
+        return;
       }
 
-      final body = await response.stream.bytesToString();
-      final result = jsonDecode(body) as Map<String, dynamic>;
+      if (response.statusCode != 200 || result['success'] != true) {
+        final errorMessage = (result['error'] ?? 'Comparison failed. Please try again.').toString();
+        _showError(errorMessage);
+        return;
+      }
 
       if (!mounted) return;
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ComparisonResultsScreen(
@@ -352,8 +432,12 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
           ),
         ),
       );
-    } catch (_) {
-      _showError('Comparison failed. Please try again.');
+
+      if (_isMemorizationMode && mounted) {
+        await _loadMemorizationStatuses();
+      }
+    } catch (e) {
+      _showError('Comparison failed. ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isComparing = false);
@@ -392,6 +476,20 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
     return (MediaQuery.of(context).size.height * 0.66).clamp(320.0, 520.0);
   }
 
+  double _collapsedPracticeCardHeight(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
+    return (124.0 + ((scale - 1.0) * 28.0)).clamp(124.0, 156.0);
+  }
+
+  double _stickyCardFootprint(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final cardHeight = _isPracticeCardExpanded
+        ? _expandedPracticeCardHeight(context)
+        : _collapsedPracticeCardHeight(context);
+    // Card vertical margins (10 + 10) + SafeArea minimum bottom (6) + device bottom inset.
+    return cardHeight + 26 + media.padding.bottom;
+  }
+
   @override
   void dispose() {
     _recordingTimer?.cancel();
@@ -403,7 +501,6 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     
     return Scaffold(
@@ -448,11 +545,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
                           12,
                           _selectedAyahIndex == null
                               ? 24
-                              : (_isPracticeCardExpanded
-                                  ? _expandedPracticeCardHeight(context) +
-                                      MediaQuery.of(context).padding.bottom +
-                                      24
-                                  : 140),
+                              : (_stickyCardFootprint(context) + 8),
                         ),
                         itemCount: _ayahs.length,
                         itemBuilder: (context, index) {
@@ -514,6 +607,11 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
                   children: [
                     _metaChip('${widget.surah['ayahs']} ayahs', context),
                     _metaChip(widget.surah['type'] as String? ?? 'Meccan', context),
+                    if (_isMemorizationMode)
+                      _metaChip(
+                        _isLoadingMemorization ? 'Loading statuses...' : 'Memorization mode',
+                        context,
+                      ),
                   ],
                 ),
               ),
@@ -566,7 +664,10 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
 
   Widget _buildAyahRow(Map<String, dynamic> ayah, int index, bool isSelected, BuildContext context) {
     final theme = Theme.of(context);
-    
+    final ayahNumber = ayah['number'] as int? ?? 0;
+    final status = _memorizationByAyah[ayahNumber]?.status ?? 'not_started';
+    final statusColor = _memorizationStatusColor(status);
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () => _goToAyahIndex(index),
@@ -622,6 +723,27 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
               ],
             ),
             const SizedBox(height: 4),
+            if (_isMemorizationMode)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    _memorizationStatusLabel(status),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ),
             Text(
               ayah['translation'] as String? ?? '',
               maxLines: isSelected ? 2 : 1,
@@ -646,7 +768,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
     final expandedHeight = _expandedPracticeCardHeight(context);
-    final collapsedHeight = 108.0;
+    final collapsedHeight = _collapsedPracticeCardHeight(context);
 
     return SafeArea(
       top: false,
@@ -732,7 +854,7 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
           ),
           if (!_isPracticeCardExpanded)
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: Row(
                 children: [
                   Expanded(
@@ -740,8 +862,9 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
                       selected['text'] as String,
                       textDirection: TextDirection.rtl,
                       overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                       style: GoogleFonts.scheherazadeNew(
-                        fontSize: 20,
+                        fontSize: 18,
                         color: theme.textTheme.bodyLarge?.color,
                       ),
                     ),
@@ -751,6 +874,11 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
                     onPressed: _togglePlayPause,
                     icon: Icon(_isPlayingAudio ? Icons.pause : Icons.play_arrow),
                     label: const Text('Listen'),
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
                   ),
                 ],
               ),

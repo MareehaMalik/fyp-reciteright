@@ -1,0 +1,66 @@
+{
+  "id": "d78f4fa2-b536-4b06-9fdd-e7c5cffd1405",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 2,
+  "mode": "practice",
+  "accuracy_score": 35.8,
+  "whisper_score": 5.0,
+  "mfcc_score": 0.0,
+  "date_time": "2026-04-15T09:05:48.285007Z",
+  "duration_seconds": 9,
+  "mistakes": [
+    {
+      "word": "ٱلْحَمْدُ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Izhar Shafawi"
+      ],
+      "errorType": "close",
+      "similarity": 0.55,
+      "occurredAt": "2026-04-15T09:05:25.696319Z"
+    },
+    {
+      "word": "لِلَّهِ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.86,
+      "occurredAt": "2026-04-15T09:05:25.698023Z"
+    },
+    {
+      "word": "رَبِّ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T09:05:25.698095Z"
+    },
+    {
+      "word": "ٱلْعَـٰلَمِينَ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-15T09:05:25.698125Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 0,
+  "close_words": 2,
+  "missing_words": 2,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001002.mp3",
+  "transcribed_text": "بسم الله الرحمن الرحيم",
+  "correct_text": "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ"
+}

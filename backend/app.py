@@ -9,7 +9,7 @@ import librosa
 import librosa.sequence
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
 import joblib
 import requests
 import tempfile
@@ -49,13 +49,19 @@ def preprocess_audio(input_path):
     try:
         y, sr = librosa.load(input_path, sr=16000, mono=True)
 
+        raw_rms = float(np.sqrt(np.mean(np.square(y)))) if y is not None and y.size > 0 else 0.0
+        raw_peak = float(np.max(np.abs(y))) if y is not None and y.size > 0 else 0.0
+
         if nr is not None:
             y_denoised = nr.reduce_noise(y=y, sr=sr, stationary=True)
         else:
             y_denoised = y
 
-        max_val = np.max(np.abs(y_denoised))
-        if max_val > 0:
+        max_val = np.max(np.abs(y_denoised)) if y_denoised is not None and y_denoised.size > 0 else 0.0
+
+        # Never amplify near-silent/noise-floor recordings; this can make silence look like speech.
+        should_normalize = (raw_rms >= 0.0045 and raw_peak >= 0.025 and max_val > 0)
+        if should_normalize:
             y_normalized = y_denoised / max_val * 0.95
         else:
             y_normalized = y_denoised
@@ -70,6 +76,60 @@ def preprocess_audio(input_path):
         print(f"⚠️ Audio preprocessing error: {e}. Using original.")
         return input_path
 
+
+def _analyze_speech_activity(audio_path):
+    """Estimate whether the audio contains meaningful speech-like content."""
+    try:
+        y, sr = librosa.load(audio_path, sr=16000, mono=True)
+        if y is None or y.size == 0:
+            return {
+                "duration_sec": 0.0,
+                "rms": 0.0,
+                "peak": 0.0,
+                "voiced_ratio": 0.0,
+                "voiced_duration_sec": 0.0,
+                "speech_detected": False,
+                "reason": "empty_audio"
+            }
+
+        duration_sec = float(len(y) / sr)
+        rms = float(np.sqrt(np.mean(np.square(y))))
+        peak = float(np.max(np.abs(y)))
+
+        intervals = librosa.effects.split(y, top_db=35)
+        voiced_samples = int(sum((end - start) for start, end in intervals))
+        voiced_duration_sec = float(voiced_samples / sr)
+        voiced_ratio = float(voiced_duration_sec / max(duration_sec, 1e-6))
+
+        speech_detected = (
+            duration_sec >= 0.60 and
+            voiced_duration_sec >= 0.20 and
+            voiced_ratio >= 0.06 and
+            rms >= 0.0025 and
+            peak >= 0.015
+        )
+
+        return {
+            "duration_sec": round(duration_sec, 3),
+            "rms": round(rms, 6),
+            "peak": round(peak, 6),
+            "voiced_ratio": round(voiced_ratio, 4),
+            "voiced_duration_sec": round(voiced_duration_sec, 3),
+            "speech_detected": bool(speech_detected),
+            "reason": "ok" if speech_detected else "no_speech"
+        }
+    except Exception as e:
+        print(f"⚠️ Speech activity analysis error: {e}")
+        return {
+            "duration_sec": 0.0,
+            "rms": 0.0,
+            "peak": 0.0,
+            "voiced_ratio": 0.0,
+            "voiced_duration_sec": 0.0,
+            "speech_detected": False,
+            "reason": "analysis_error"
+        }
+
 # ── STEP 2: Transcribe Audio ───────────────────────────────────────────────────
 def transcribe_audio(audio_path):
     """Transcribe audio using Faster-Whisper"""
@@ -81,13 +141,110 @@ def transcribe_audio(audio_path):
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500)
         )
-        text = " ".join([seg.text.strip() for seg in segments])
+        segments = list(segments)
+        text = " ".join([seg.text.strip() for seg in segments]).strip()
+
+        no_speech_vals = [float(getattr(seg, "no_speech_prob", 0.0)) for seg in segments]
+        logprob_vals = [float(getattr(seg, "avg_logprob", -2.0)) for seg in segments]
+
+        meta = {
+            "text": text,
+            "segment_count": len(segments),
+            "mean_no_speech_prob": float(np.mean(no_speech_vals)) if no_speech_vals else 1.0,
+            "avg_logprob": float(np.mean(logprob_vals)) if logprob_vals else -5.0,
+            "language_probability": float(getattr(info, "language_probability", 0.0) or 0.0),
+        }
+
         print(f"🎤 Transcribed: '{text}'")
-        print(f"📊 Confidence: {info.language_probability:.2%}")
-        return text.strip()
+        print(f"📊 Confidence: {meta['language_probability']:.2%}")
+        print(
+            f"🧪 ASR meta: segments={meta['segment_count']}, "
+            f"no_speech={meta['mean_no_speech_prob']:.3f}, avg_logprob={meta['avg_logprob']:.3f}"
+        )
+        return meta
     except Exception as e:
         print(f"❌ Transcription error: {e}")
-        return ""
+        return {
+            "text": "",
+            "segment_count": 0,
+            "mean_no_speech_prob": 1.0,
+            "avg_logprob": -5.0,
+            "language_probability": 0.0,
+        }
+
+
+def _passes_transcription_gate(transcription_meta, correct_text=""):
+    """Reject empty or low-confidence ASR outputs that commonly come from silence/noise."""
+    text = (transcription_meta or {}).get("text", "") or ""
+    arabic_chars = len(re.findall(r"[\u0621-\u064A]", text))
+    transcribed_words = len(text.split())
+    segment_count = int((transcription_meta or {}).get("segment_count", 0) or 0)
+    no_speech_prob = float((transcription_meta or {}).get("mean_no_speech_prob", 1.0) or 1.0)
+    avg_logprob = float((transcription_meta or {}).get("avg_logprob", -5.0) or -5.0)
+    lang_prob = float((transcription_meta or {}).get("language_probability", 0.0) or 0.0)
+
+    correct_words = correct_text.split() if correct_text else []
+    expected_words = len(correct_words)
+    expected_arabic_chars = len(re.findall(r"[\u0621-\u064A]", correct_text)) if correct_text else 0
+
+    if arabic_chars < 2:
+        return False
+    if transcribed_words == 0:
+        return False
+    if segment_count == 0:
+        return False
+    if no_speech_prob > 0.92 and avg_logprob < -1.4:
+        return False
+    if avg_logprob < -2.3:
+        return False
+    if lang_prob < 0.15 and no_speech_prob > 0.85:
+        return False
+
+    # If expected text is known, reject implausibly short hallucinated transcripts.
+    if expected_words >= 3:
+        word_coverage = transcribed_words / float(expected_words)
+        if word_coverage < 0.30:
+            return False
+    if expected_arabic_chars >= 12:
+        char_coverage = arabic_chars / float(expected_arabic_chars)
+        if char_coverage < 0.22:
+            return False
+
+    return True
+
+
+def _compute_confidence_multiplier(speech_stats, transcription_meta, correct_words_count=0, transcribed_words_count=0):
+    """Down-weight scores when speech/transcription confidence is weak."""
+    voiced_ratio = float((speech_stats or {}).get("voiced_ratio", 0.0) or 0.0)
+    rms = float((speech_stats or {}).get("rms", 0.0) or 0.0)
+    no_speech_prob = float((transcription_meta or {}).get("mean_no_speech_prob", 1.0) or 1.0)
+    avg_logprob = float((transcription_meta or {}).get("avg_logprob", -5.0) or -5.0)
+
+    if correct_words_count > 0:
+        coverage = min(1.0, transcribed_words_count / float(correct_words_count))
+    else:
+        coverage = 0.0
+
+    voiced_factor = _clamp((voiced_ratio - 0.03) / 0.30, 0.0, 1.0)
+    rms_factor = _clamp((rms - 0.0015) / 0.02, 0.0, 1.0)
+    logprob_factor = _clamp((avg_logprob + 2.2) / 2.0, 0.0, 1.0)
+    no_speech_factor = _clamp(1.0 - ((no_speech_prob - 0.20) / 0.75), 0.0, 1.0)
+    coverage_factor = _clamp(coverage / 0.80, 0.0, 1.0)
+
+    confidence = (
+        (voiced_factor * 0.35) +
+        (rms_factor * 0.20) +
+        (logprob_factor * 0.20) +
+        (no_speech_factor * 0.15) +
+        (coverage_factor * 0.10)
+    )
+
+    if not _passes_transcription_gate(transcription_meta):
+        confidence = min(confidence, 0.12)
+    if voiced_ratio < 0.04:
+        confidence = min(confidence, 0.08)
+
+    return _clamp(confidence, 0.0, 1.0)
 
 # ── STEP 3: Text Normalization ─────────────────────────────────────────────────
 def normalize_arabic(text):
@@ -499,6 +656,40 @@ def get_feedback(score):
     if score >= 40: return "Pehle Qari ko dhyan se suno 🎧"
     return "Qari ki awaaz sun ke repeat karo 🔁"
 
+
+def _clamp(value, min_value=0.0, max_value=100.0):
+    return float(max(min_value, min(max_value, value)))
+
+
+def _normalize_mfcc(mfcc):
+    """Cepstral mean/variance normalize MFCCs for more stable DTW distances."""
+    if mfcc is None or mfcc.size == 0:
+        return mfcc
+    mean = np.mean(mfcc, axis=1, keepdims=True)
+    std = np.std(mfcc, axis=1, keepdims=True) + 1e-8
+    return (mfcc - mean) / std
+
+
+def _levenshtein_distance(seq1, seq2):
+    """Simple Levenshtein distance for phoneme sequences."""
+    if seq1 == seq2:
+        return 0
+    if len(seq1) == 0:
+        return len(seq2)
+    if len(seq2) == 0:
+        return len(seq1)
+
+    prev = list(range(len(seq2) + 1))
+    for i, c1 in enumerate(seq1, start=1):
+        curr = [i]
+        for j, c2 in enumerate(seq2, start=1):
+            ins = curr[j - 1] + 1
+            delete = prev[j] + 1
+            subst = prev[j - 1] + (0 if c1 == c2 else 1)
+            curr.append(min(ins, delete, subst))
+        prev = curr
+    return prev[-1]
+
 # ── HYBRID SCORING SYSTEM ──────────────────────────────────────────────────
 # Component 1: Audio Quality (20%) - MFCC Cosine Similarity
 # Component 2: Phoneme Accuracy (60%) - DTW-based comparison
@@ -512,28 +703,38 @@ def compute_dtw_score(user_mfcc, qari_mfcc):
     Returns normalized score (0-100)
     """
     try:
-        # Compute DTW cost matrix
-        C = librosa.sequence.dtw(user_mfcc, qari_mfcc, metric='euclidean')
-
-        # Normalize by the length of the longer sequence
-        max_len = max(user_mfcc.shape[1], qari_mfcc.shape[1])
-        if max_len == 0:
+        if user_mfcc is None or qari_mfcc is None:
+            return 0.0
+        if user_mfcc.size == 0 or qari_mfcc.size == 0:
             return 0.0
 
-        # DTW cost is distance; convert to similarity (0-100)
-        # Lower cost = more similar
-        normalized_cost = C[-1, -1] / (max_len * user_mfcc.shape[0])
+        user_norm = _normalize_mfcc(user_mfcc)
+        qari_norm = _normalize_mfcc(qari_mfcc)
 
-        # Convert distance to similarity score (0-100)
-        # Clamp: 0.0 cost → 100%, higher costs → lower scores
-        dtw_score = max(0, 100 - (normalized_cost * 50))
-        dtw_score = min(100, dtw_score)
+        # Frame-level cosine distance matrix, then DTW over that matrix.
+        local_cost = cosine_distances(user_norm.T, qari_norm.T)
+        D, wp = librosa.sequence.dtw(C=local_cost)
 
-        print(f"  🎯 DTW Cost: {C[-1, -1]:.2f}, Normalized: {normalized_cost:.3f}, Score: {dtw_score:.1f}")
-        return float(dtw_score)
+        path_len = max(1, len(wp))
+        avg_path_cost = float(D[-1, -1]) / path_len
+
+        # Penalize extreme duration mismatch, but keep DTW mostly tempo-invariant.
+        duration_ratio = min(user_mfcc.shape[1], qari_mfcc.shape[1]) / max(1, max(user_mfcc.shape[1], qari_mfcc.shape[1]))
+        duration_factor = 0.70 + (0.30 * duration_ratio)
+
+        # Exponential mapping gives better spread than a flat linear rule.
+        dtw_similarity = 100.0 * np.exp(-2.2 * avg_path_cost)
+        dtw_similarity *= duration_factor
+        dtw_score = _clamp(dtw_similarity)
+
+        print(
+            f"  🎯 DTW AvgPathCost: {avg_path_cost:.4f}, PathLen: {path_len}, "
+            f"DurationFactor: {duration_factor:.3f}, Score: {dtw_score:.1f}"
+        )
+        return dtw_score
     except Exception as e:
         print(f"⚠️ DTW computation error: {e}")
-        return 50.0
+        return 35.0
 
 def compute_phoneme_accuracy(user_words, correct_words, aligned_items):
     """
@@ -545,8 +746,8 @@ def compute_phoneme_accuracy(user_words, correct_words, aligned_items):
     if not correct_words or len(correct_words) == 0:
         return 0.0
 
-    correct_phonemes = 0
-    total_phonemes = 0
+    matched_weight = 0.0
+    total_phonemes = 0.0
 
     for item in aligned_items:
         if not item["correct_word"]:
@@ -557,29 +758,33 @@ def compute_phoneme_accuracy(user_words, correct_words, aligned_items):
         status = item["status"]
 
         correct_phon = extract_phonemes(correct_word)
-        total_phonemes += len(correct_phon)
+        phon_count = max(1, len(correct_phon))
+        total_phonemes += phon_count
 
+        if status == "missing" or not user_word:
+            continue
+
+        user_phon = extract_phonemes(user_word)
+        if not user_phon:
+            continue
+
+        edit_distance = _levenshtein_distance(correct_phon, user_phon)
+        norm_len = max(len(correct_phon), len(user_phon), 1)
+        phoneme_sim = max(0.0, 1.0 - (edit_distance / norm_len))
+
+        # Blend lexical similarity from alignment with phoneme edit similarity.
+        lexical_sim = float(item.get("similarity", 0.0))
         if status == "correct":
-            # Perfect match
-            correct_phonemes += len(correct_phon)
-        elif status == "close" and user_word:
-            # Partial match: award based on similarity
-            user_phon = extract_phonemes(user_word)
-            match_count = 0
-            for p in user_phon:
-                if p in correct_phon:
-                    match_count += 1
-            correct_phonemes += match_count
-        elif status == "missing":
-            # Word not said
-            pass
+            lexical_sim = max(lexical_sim, 0.98)
+
+        combined_sim = (phoneme_sim * 0.70) + (lexical_sim * 0.30)
+        matched_weight += (combined_sim * phon_count)
 
     if total_phonemes == 0:
         return 0.0
 
-    phoneme_accuracy = (correct_phonemes / total_phonemes) * 100
-    phoneme_accuracy = min(100, phoneme_accuracy)
-    print(f"  📞 Phoneme Accuracy: {correct_phonemes}/{total_phonemes} = {phoneme_accuracy:.1f}%")
+    phoneme_accuracy = _clamp((matched_weight / total_phonemes) * 100)
+    print(f"  📞 Phoneme Accuracy: weighted {matched_weight:.1f}/{total_phonemes:.1f} = {phoneme_accuracy:.1f}%")
     return float(phoneme_accuracy)
 
 def verify_tajweed_timing(correct_text, user_audio_path, qari_audio_path):
@@ -635,16 +840,36 @@ def verify_tajweed_timing(correct_text, user_audio_path, qari_audio_path):
                     else:
                         print(f"    ⏱️ {rule_name}: Duration ratio {duration_ratio:.2f} (expected ~1.0)")
 
-        if tajweed_checks == 0:
-            return 100.0  # No rules to verify
+        # Global rhythm similarity (envelope-based) to avoid a flat tajweed score.
+        user_env = librosa.onset.onset_strength(y=user_y, sr=user_sr)
+        qari_env = librosa.onset.onset_strength(y=qari_y, sr=qari_sr)
 
-        tajweed_timing_score = (tajweed_correct / tajweed_checks) * 100
-        print(f"  ✅ Tajweed Timing: {tajweed_correct}/{tajweed_checks} rules correct = {tajweed_timing_score:.1f}%")
-        return float(tajweed_timing_score)
+        target_bins = 200
+        user_env_resampled = librosa.resample(user_env.astype(np.float32), orig_sr=max(1, len(user_env)), target_sr=target_bins)
+        qari_env_resampled = librosa.resample(qari_env.astype(np.float32), orig_sr=max(1, len(qari_env)), target_sr=target_bins)
+
+        env_similarity = cosine_similarity([user_env_resampled], [qari_env_resampled])[0][0]
+        rhythm_score = _clamp(((float(env_similarity) + 1.0) / 2.0) * 100.0)
+
+        duration_ratio = user_duration / max(0.1, qari_duration)
+        duration_score = _clamp(np.exp(-1.5 * abs(np.log(max(0.1, duration_ratio)))) * 100.0)
+
+        if tajweed_checks > 0:
+            explicit_rules_score = (tajweed_correct / tajweed_checks) * 100.0
+        else:
+            explicit_rules_score = 60.0
+
+        tajweed_timing_score = (explicit_rules_score * 0.45) + (rhythm_score * 0.35) + (duration_score * 0.20)
+        tajweed_timing_score = _clamp(tajweed_timing_score)
+        print(
+            f"  ✅ Tajweed Timing: explicit={explicit_rules_score:.1f}, rhythm={rhythm_score:.1f}, "
+            f"duration={duration_score:.1f} => {tajweed_timing_score:.1f}"
+        )
+        return tajweed_timing_score
 
     except Exception as e:
         print(f"⚠️ Tajweed timing verification error: {e}")
-        return 75.0  # Default neutral score
+        return 60.0  # Default neutral score
 
 def compute_hybrid_score(audio_quality_score, phoneme_accuracy_score, tajweed_timing_score):
     """
@@ -712,13 +937,16 @@ def compare():
     try:
         print(f"\n📝 === COMPARISON REQUEST ===")
         print(f"📂 Surah: {surah}, Ayah: {ayah}")
-        processed_path = preprocess_audio(user_tmp.name)
-
-        transcribed_text = transcribe_audio(processed_path)
-        if not transcribed_text:
-            return jsonify({"error": "Transcription failed", "success": False}), 500
-
-        print(f"✍️ User transcribed: '{transcribed_text}'")
+        # Gate silence from raw input before any preprocessing can alter energy profile.
+        raw_speech_stats = _analyze_speech_activity(user_tmp.name)
+        print(f"🗣️ Raw speech activity: {raw_speech_stats}")
+        if not raw_speech_stats.get("speech_detected", False):
+            return jsonify({
+                "success": False,
+                "error": "No recitation detected. Please recite clearly and try again.",
+                "reason": "no_speech_detected",
+                "speech_activity": raw_speech_stats
+            }), 422
 
         if not correct_text:
             try:
@@ -726,7 +954,42 @@ def compare():
                 resp = requests.get(api_url, timeout=10)
                 correct_text = resp.json()["verse"]["text_uthmani"]
             except:
-                correct_text = transcribed_text
+                correct_text = ""
+
+        processed_path = preprocess_audio(user_tmp.name)
+
+        speech_stats = _analyze_speech_activity(processed_path)
+        print(f"🗣️ Speech activity: {speech_stats}")
+        if not speech_stats.get("speech_detected", False):
+            return jsonify({
+                "success": False,
+                "error": "No recitation detected. Please recite clearly and try again.",
+                "reason": "no_speech_detected",
+                "speech_activity": speech_stats
+            }), 422
+
+        transcription_meta = transcribe_audio(processed_path)
+        transcribed_text = (transcription_meta or {}).get("text", "").strip()
+        if not _passes_transcription_gate(transcription_meta, correct_text=correct_text):
+            return jsonify({
+                "success": False,
+                "error": "Low-confidence transcription. Please recite louder and closer to microphone.",
+                "reason": "low_transcription_confidence",
+                "speech_activity": speech_stats,
+                "transcription_meta": {
+                    "segment_count": int(transcription_meta.get("segment_count", 0)),
+                    "mean_no_speech_prob": float(transcription_meta.get("mean_no_speech_prob", 1.0)),
+                    "avg_logprob": float(transcription_meta.get("avg_logprob", -5.0)),
+                    "language_probability": float(transcription_meta.get("language_probability", 0.0)),
+                }
+            }), 422
+        if not transcribed_text:
+            return jsonify({"error": "Transcription failed", "success": False}), 500
+
+        print(f"✍️ User transcribed: '{transcribed_text}'")
+
+        if not correct_text:
+            correct_text = transcribed_text
 
         print(f"✅ Correct text: '{correct_text}'")
 
@@ -812,7 +1075,13 @@ def compare():
         print(f"\n🎯 === HYBRID SCORING (3-Component) ===")
 
         # Component 1: Audio Quality Score (20%)
-        audio_quality_score = 50.0
+        audio_quality_score = 20.0
+        dtw_score = 0.0
+        direct_phoneme_score = 0.0
+        scoring_debug = {
+            "qari_audio_available": bool(qari_path),
+            "fallbacks": []
+        }
         if qari_path:
             try:
                 user_feat = extract_features(processed_path)
@@ -824,10 +1093,12 @@ def compare():
                 print(f"  🔊 [1/3] Audio Quality Score: {audio_quality_score}")
             except Exception as e:
                 print(f"⚠️ Audio Quality error: {e}")
-                audio_quality_score = 50.0
+                audio_quality_score = 20.0
+                scoring_debug["fallbacks"].append("audio_quality_default")
         else:
             print(f"  🔊 Could not download Qari audio (using default)")
-            audio_quality_score = 50.0
+            audio_quality_score = 20.0
+            scoring_debug["fallbacks"].append("qari_audio_missing")
 
         # Component 2: Phoneme Accuracy Score (60%) - using DTW
         phoneme_accuracy_score = 0.0
@@ -843,27 +1114,38 @@ def compare():
                 direct_phoneme_score = compute_phoneme_accuracy(user_words, correct_words, aligned)
 
                 # Combine DTW and phoneme analysis
-                phoneme_accuracy_score = (dtw_score * 0.5 + direct_phoneme_score * 0.5)
+                phoneme_accuracy_score = (dtw_score * 0.60 + direct_phoneme_score * 0.40)
                 print(f"  📞 [2/3] Phoneme Accuracy Score: {phoneme_accuracy_score:.1f}")
                 print(f"         (DTW: {dtw_score:.1f}% + Direct Phoneme: {direct_phoneme_score:.1f}%)")
             except Exception as e:
                 print(f"⚠️ Phoneme accuracy error: {e}")
-                phoneme_accuracy_score = whisper_score  # Fallback to old whisper score
+                phoneme_accuracy_score = whisper_score
+                scoring_debug["fallbacks"].append("phoneme_fallback_to_whisper")
         else:
             phoneme_accuracy_score = whisper_score
+            scoring_debug["fallbacks"].append("phoneme_fallback_no_qari")
 
         # Component 3: Tajweed Timing Score (20%)
-        tajweed_timing_score = 50.0
+        tajweed_timing_score = 20.0
         if qari_path:
             try:
                 tajweed_timing_score = verify_tajweed_timing(correct_text, processed_path, qari_path)
                 print(f"  ✅ [3/3] Tajweed Timing Score: {tajweed_timing_score:.1f}")
             except Exception as e:
                 print(f"⚠️ Tajweed timing error: {e}")
-                tajweed_timing_score = 50.0
+                tajweed_timing_score = 20.0
+                scoring_debug["fallbacks"].append("tajweed_timing_default")
 
         # Compute final hybrid score
-        final_score = compute_hybrid_score(audio_quality_score, phoneme_accuracy_score, tajweed_timing_score)
+        confidence_multiplier = _compute_confidence_multiplier(
+            speech_stats,
+            transcription_meta,
+            correct_words_count=len(correct_words),
+            transcribed_words_count=len(user_words)
+        )
+
+        raw_hybrid_score = compute_hybrid_score(audio_quality_score, phoneme_accuracy_score, tajweed_timing_score)
+        final_score = round(raw_hybrid_score * confidence_multiplier, 1)
         mfcc_score = audio_quality_score  # Keep for backward compatibility
 
         print(f"\n🏆 FINAL HYBRID SCORING:")
@@ -871,6 +1153,8 @@ def compare():
         print(f"  Phoneme Accuracy:   {phoneme_accuracy_score:.1f} × 0.60 = {phoneme_accuracy_score * 0.60:.1f}")
         print(f"  Tajweed Timing:     {tajweed_timing_score:.1f} × 0.20 = {tajweed_timing_score * 0.20:.1f}")
         print(f"  " + "="*50)
+        print(f"  Raw Hybrid Score:   {raw_hybrid_score}")
+        print(f"  Confidence Mult:    {confidence_multiplier:.3f}")
         print(f"  FINAL SCORE:        {final_score}")
         print(f"  GRADE:              {get_grade(final_score)}")
 
@@ -891,21 +1175,33 @@ def compare():
             },
             "metrics": {
                 "whisper_score": float(whisper_score),
+                "dtw_score": float(dtw_score),
+                "direct_phoneme_score": float(direct_phoneme_score),
                 "mfcc_score": float(mfcc_score),
+                "phoneme_accuracy_score": float(phoneme_accuracy_score),
+                "tajweed_timing_score": float(tajweed_timing_score),
                 "final_score": float(final_score)
             },
             "hybrid_scoring": {
+                "raw_hybrid_score": float(raw_hybrid_score),
+                "confidence_multiplier": float(confidence_multiplier),
                 "audio_quality_score": float(audio_quality_score),
+                "dtw_score": float(dtw_score),
+                "direct_phoneme_score": float(direct_phoneme_score),
                 "phoneme_accuracy_score": float(phoneme_accuracy_score),
                 "tajweed_timing_score": float(tajweed_timing_score),
                 "method": "Hybrid (Audio 20% + Phoneme 60% + Tajweed 20%)",
                 "dtw_enabled": True,
+                "debug": scoring_debug,
                 "explanation": {
                     "audio_quality": "Overall voice quality, timbre, and energy distribution",
                     "phoneme_accuracy": "DTW-aligned phoneme matching (tempo-invariant)",
-                    "tajweed_timing": "Verification of Tajweed rule timing and application"
+                    "tajweed_timing": "Verification of Tajweed rule timing and application",
+                    "confidence_multiplier": "Guards against silence/low-confidence ASR by down-weighting the final score"
                 }
             },
+            "speech_activity": speech_stats,
+            "raw_speech_activity": raw_speech_stats,
             "reference_audio_url": str(qari_url) if qari_path else "",
             "inference_time_ms": float(elapsed),
             "surah": str(surah),
@@ -957,8 +1253,33 @@ def transcribe():
 
     try:
         print(f"🎤 Transcribing audio: {audio_tmp.name}")
-        segments, _ = whisper_model.transcribe(audio_tmp.name, language="ar")
-        transcribed_text = " ".join([seg.text for seg in segments]).strip()
+        speech_stats = _analyze_speech_activity(audio_tmp.name)
+        if not speech_stats.get("speech_detected", False):
+            return jsonify({
+                "success": False,
+                "error": "No recitation detected. Please recite clearly and try again.",
+                "reason": "no_speech_detected",
+                "speech_activity": speech_stats,
+                "similarity_score": 0.0
+            }), 422
+
+        transcription_meta = transcribe_audio(audio_tmp.name)
+        transcribed_text = transcription_meta.get("text", "").strip()
+        if not _passes_transcription_gate(transcription_meta, correct_text=correct_text):
+            return jsonify({
+                "success": False,
+                "error": "Low-confidence transcription. Please recite louder and closer to microphone.",
+                "reason": "low_transcription_confidence",
+                "speech_activity": speech_stats,
+                "transcription_meta": {
+                    "segment_count": int(transcription_meta.get("segment_count", 0)),
+                    "mean_no_speech_prob": float(transcription_meta.get("mean_no_speech_prob", 1.0)),
+                    "avg_logprob": float(transcription_meta.get("avg_logprob", -5.0)),
+                    "language_probability": float(transcription_meta.get("language_probability", 0.0)),
+                },
+                "similarity_score": 0.0
+            }), 422
+
         print(f"✅ Transcription: {transcribed_text}")
 
         ratio = SequenceMatcher(

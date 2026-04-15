@@ -1,16 +1,17 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:tajweed_corrector/services/backend_config.dart';
 
 /// API service for communicating with Python FastAPI backend
 /// Handles audio comparison using DTW algorithm
 class ApiService {
-  static const String _baseUrl =
-      'http://192.168.100.7:8000'; // Change to your server IP for testing on device
+  static const String _baseUrl = BackendConfig.baseUrl;
   
   late Dio _dio;
 
   ApiService() {
+    BackendConfig.debugPrintConfig();
     _dio = Dio(
       BaseOptions(
         baseUrl: _baseUrl,

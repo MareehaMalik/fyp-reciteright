@@ -347,6 +347,15 @@ class _SurahListScreenState extends State<SurahListScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _buildStatusTag('Learning ${memo.learningAyahs}', const Color(0xFF1565C0)),
+                          _buildStatusTag('Needs review ${memo.needsReviewAyahs}', const Color(0xFFE65100)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
@@ -402,6 +411,24 @@ class _SurahListScreenState extends State<SurahListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Widget _buildStatusTag(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 

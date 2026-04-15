@@ -1,0 +1,66 @@
+{
+  "id": "0f7a6207-bfee-4b55-9486-0cd6ca0d2abd",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 2,
+  "mode": "memorization",
+  "accuracy_score": 36.9,
+  "whisper_score": 0.0,
+  "mfcc_score": 0.0,
+  "date_time": "2026-04-14T16:10:55.579418Z",
+  "duration_seconds": 23,
+  "mistakes": [
+    {
+      "word": "ٱلْحَمْدُ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Izhar Shafawi"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T16:10:32.406311Z"
+    },
+    {
+      "word": "لِلَّهِ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.67,
+      "occurredAt": "2026-04-14T16:10:32.408318Z"
+    },
+    {
+      "word": "رَبِّ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T16:10:32.408377Z"
+    },
+    {
+      "word": "ٱلْعَـٰلَمِينَ",
+      "ayah": 2,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T16:10:32.408405Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 0,
+  "close_words": 1,
+  "missing_words": 3,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001002.mp3",
+  "transcribed_text": "سوف تكون في الأولة في الأولة نعم يجب أن يكون في الأولة",
+  "correct_text": "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ"
+}

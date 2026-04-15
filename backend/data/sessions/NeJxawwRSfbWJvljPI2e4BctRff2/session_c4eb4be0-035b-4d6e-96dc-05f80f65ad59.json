@@ -1,0 +1,57 @@
+{
+  "id": "c4eb4be0-035b-4d6e-96dc-05f80f65ad59",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 1,
+  "mode": "practice",
+  "accuracy_score": 34.9,
+  "whisper_score": 77.5,
+  "mfcc_score": 15.0,
+  "date_time": "2026-04-15T10:23:18.359966Z",
+  "duration_seconds": 10,
+  "mistakes": [
+    {
+      "word": "ٱللَّهِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.75,
+      "occurredAt": "2026-04-15T10:22:55.832499Z"
+    },
+    {
+      "word": "ٱلرَّحْمَـٰنِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.73,
+      "occurredAt": "2026-04-15T10:22:55.832610Z"
+    },
+    {
+      "word": "ٱلرَّحِيمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.55,
+      "occurredAt": "2026-04-15T10:22:55.832664Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 1,
+  "close_words": 3,
+  "missing_words": 0,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001001.mp3",
+  "transcribed_text": "بسم الله و رحمان و رحمان",
+  "correct_text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+}

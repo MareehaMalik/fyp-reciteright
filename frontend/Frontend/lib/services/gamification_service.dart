@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:tajweed_corrector/models/gamification_models.dart';
+import 'package:tajweed_corrector/services/backend_config.dart';
 
 /// Service for fetching and managing gamification metrics
 class GamificationService {
   final Dio _dio;
-  static const String _baseUrl =
-      'http://192.168.100.7:8000'; // Update to your backend URL
+  static const String _baseUrl = BackendConfig.baseUrl;
 
   GamificationService({Dio? dio})
       : _dio = dio ??

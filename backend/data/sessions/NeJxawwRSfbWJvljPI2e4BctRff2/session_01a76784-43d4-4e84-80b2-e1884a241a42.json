@@ -1,0 +1,66 @@
+{
+  "id": "01a76784-43d4-4e84-80b2-e1884a241a42",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 1,
+  "mode": "practice",
+  "accuracy_score": 34.2,
+  "whisper_score": 0.0,
+  "mfcc_score": 6.2,
+  "date_time": "2026-04-14T14:45:56.438200Z",
+  "duration_seconds": 11,
+  "mistakes": [
+    {
+      "word": "بِسْمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [],
+      "errorType": "close",
+      "similarity": 0.8,
+      "occurredAt": "2026-04-14T14:45:33.160684Z"
+    },
+    {
+      "word": "ٱللَّهِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T14:45:33.162733Z"
+    },
+    {
+      "word": "ٱلرَّحْمَـٰنِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T14:45:33.162810Z"
+    },
+    {
+      "word": "ٱلرَّحِيمِ",
+      "ayah": 1,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-14T14:45:33.162838Z"
+    }
+  ],
+  "total_words": 4,
+  "correct_words": 0,
+  "close_words": 1,
+  "missing_words": 3,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001001.mp3",
+  "transcribed_text": "بس ملا يروح ملا يروح",
+  "correct_text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"
+}

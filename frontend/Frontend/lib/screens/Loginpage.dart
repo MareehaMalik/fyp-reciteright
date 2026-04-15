@@ -590,7 +590,7 @@ import 'package:flutter/material.dart';
 import 'package:tajweed_corrector/services/auth_service.dart';
 import 'package:tajweed_corrector/screens/SignUpScreen.dart';
 import 'package:tajweed_corrector/utils/responsive_helper.dart';
-import 'package:tajweed_corrector/home/home.dart';
+import 'package:tajweed_corrector/screens/NewHomeScreen_Gamified.dart';
 import 'package:tajweed_corrector/widgets/index.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -620,7 +620,7 @@ class _LoginScreenState extends State<LoginScreen> {
     ) {
       if (user != null && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const ReciteRightScreen()),
+          MaterialPageRoute(builder: (context) => const NewHomeScreen()),
           (route) => false,
         );
       }

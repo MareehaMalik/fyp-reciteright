@@ -97,14 +97,23 @@ def build_memorization_summary(items: List[MemorizationItem]) -> MemorizationSum
 
     surah_summaries: List[SurahSummary] = []
     total_memo = 0
+    total_learning = 0
+    total_needs_review = 0
+    total_tracked = 0
     total_ayahs_accum = 0
 
     for surah, surah_items in sorted(grouped.items(), key=lambda kv: kv[0]):
         total_ayahs = SURAH_AYAH_COUNTS.get(surah, 0)
         memorized_count = sum(1 for i in surah_items if i.status == "memorized")
+        learning_count = sum(1 for i in surah_items if i.status == "learning")
+        needs_review_count = sum(1 for i in surah_items if i.status == "needs_review")
+        not_started_count = max(total_ayahs - (memorized_count + learning_count + needs_review_count), 0)
         last_activity = max((i.last_recited_at or "" for i in surah_items), default=None)
 
         total_memo += memorized_count
+        total_learning += learning_count
+        total_needs_review += needs_review_count
+        total_tracked += len(surah_items)
         total_ayahs_accum += total_ayahs
 
         percent = (memorized_count / total_ayahs * 100.0) if total_ayahs > 0 else 0.0
@@ -114,13 +123,23 @@ def build_memorization_summary(items: List[MemorizationItem]) -> MemorizationSum
                 surah_name=SURAH_NAMES.get(surah, f"Surah {surah}"),
                 total_ayahs=total_ayahs,
                 memorized_ayahs=memorized_count,
+                learning_ayahs=learning_count,
+                needs_review_ayahs=needs_review_count,
+                not_started_ayahs=not_started_count,
                 percent_memorized=round(percent, 1),
                 last_activity_at=last_activity,
             )
         )
 
     overall = (total_memo / total_ayahs_accum * 100.0) if total_ayahs_accum > 0 else 0.0
-    return MemorizationSummary(overall_percent=round(overall, 1), surah_summaries=surah_summaries)
+    return MemorizationSummary(
+        overall_percent=round(overall, 1),
+        total_memorized=total_memo,
+        total_learning=total_learning,
+        total_needs_review=total_needs_review,
+        total_tracked_ayahs=total_tracked,
+        surah_summaries=surah_summaries,
+    )
 
 
 def recommended_today(items: List[MemorizationItem], limit: int = 5) -> List[Dict[str, Any]]:
