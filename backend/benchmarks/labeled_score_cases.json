@@ -1,0 +1,38 @@
+[
+  {
+    "id": "fatiha_ayah1_perfect",
+    "correct_text": "بسم الله الرحمن الرحيم",
+    "transcribed_text": "بسم الله الرحمن الرحيم",
+    "expected_score": 95,
+    "notes": "Perfect transcription should remain high."
+  },
+  {
+    "id": "fatiha_ayah1_minor_close",
+    "correct_text": "بسم الله الرحمن الرحيم",
+    "transcribed_text": "بسم الله رحمن الرحيم",
+    "expected_score": 78,
+    "notes": "One close miss should not collapse the score."
+  },
+  {
+    "id": "fatiha_ayah1_missing_word",
+    "correct_text": "بسم الله الرحمن الرحيم",
+    "transcribed_text": "بسم الله الرحيم",
+    "expected_score": 58,
+    "notes": "Missing a key word should penalize strongly."
+  },
+  {
+    "id": "fatiha_ayah1_with_extra_noise_word",
+    "correct_text": "بسم الله الرحمن الرحيم",
+    "transcribed_text": "بسم الله الرحمن الرحيم الحمد",
+    "expected_score": 82,
+    "notes": "One extra word should penalize, but with bounded impact."
+  },
+  {
+    "id": "fatiha_ayah1_low_match",
+    "correct_text": "بسم الله الرحمن الرحيم",
+    "transcribed_text": "الحمد لله رب العالمين",
+    "expected_score": 15,
+    "notes": "Low lexical overlap should score very low."
+  }
+]
+

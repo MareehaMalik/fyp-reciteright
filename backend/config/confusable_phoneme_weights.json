@@ -1,0 +1,17 @@
+{
+  "groups": [
+    ["s", "S"],
+    ["d", "D"],
+    ["t", "T"],
+    ["dh", "DH"],
+    ["h", "H"],
+    ["a", "aa"],
+    ["w", "uu"],
+    ["y", "ii"]
+  ],
+  "same_group_substitution_cost": 0.45,
+  "default_substitution_cost": 1.0,
+  "insertion_cost": 1.0,
+  "deletion_cost": 1.0
+}
+

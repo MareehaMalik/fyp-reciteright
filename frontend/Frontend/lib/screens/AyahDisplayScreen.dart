@@ -1609,14 +1609,14 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Playback Settings',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: theme.primaryColor,
-          ),
-        ),
+        // Text(
+        //   'Playback Settings',
+        //   style: TextStyle(
+        //     fontSize: 13,
+        //     fontWeight: FontWeight.w700,
+        //     color: theme.primaryColor,
+        //   ),
+        // ),
         const SizedBox(height: 8),
         SwitchListTile.adaptive(
           dense: true,
