@@ -168,21 +168,32 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
             ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _retakeQuiz,
-          child: const Text('Retake Quiz'),
-        ),
-        if (passed)
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Next Lesson →'),
-          ),
-      ],
+       actions: [
+         TextButton(
+           onPressed: () {
+             Navigator.of(context).pop(); // close popup
+             Navigator.of(context).pop(); // go back to lesson
+           },
+           child: const Text(
+             'Finish Quiz',
+             style: TextStyle(
+               color: Colors.grey,
+               fontWeight: FontWeight.w600,
+             ),
+           ),
+         ),
+         ElevatedButton(
+           onPressed: _retakeQuiz,
+           style: ElevatedButton.styleFrom(
+             backgroundColor: Theme.of(context).primaryColor,
+             foregroundColor: Colors.white,
+             shape: RoundedRectangleBorder(
+               borderRadius: BorderRadius.circular(8),
+             ),
+           ),
+           child: const Text('Retake Quiz'),
+         ),
+       ],
     );
   }
 

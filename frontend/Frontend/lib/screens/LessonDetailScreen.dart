@@ -32,7 +32,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _audioPlayer = AudioPlayer();
-    
+
     // Stop audio when switching tabs
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
@@ -42,7 +42,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
         }
       }
     });
-    
+
     _audioPlayer.playerStateStream.listen((PlayerState state) {
       _onAudioStateChanged(state);
     });
@@ -387,41 +387,43 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
           const SizedBox(height: 10),
           _buildTipCard(section.tip),
           const SizedBox(height: 12),
-           Align(
-             alignment: Alignment.centerLeft,
-             child: ElevatedButton.icon(
-               onPressed: _loadingAudioBySection[index] == true
-                   ? null
-                   : () => _toggleAyahAudio(index),
-               style: ElevatedButton.styleFrom(
-                 backgroundColor: _playingAudioBySection[index] == true
-                     ? Colors.red
-                     : widget.lesson.color,
-                 foregroundColor: Colors.white,
-               ),
-               icon: _loadingAudioBySection[index] == true
-                   ? const SizedBox(
-                       width: 16,
-                       height: 16,
-                       child: CircularProgressIndicator(
-                         strokeWidth: 2,
-                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                       ),
-                     )
-                   : Icon(
-                       _playingAudioBySection[index] == true
-                           ? Icons.stop_circle_rounded
-                           : Icons.play_arrow_rounded,
-                     ),
-               label: Text(
-                 _loadingAudioBySection[index] == true
-                     ? 'Loading...'
-                     : _playingAudioBySection[index] == true
-                         ? 'Stop'
-                         : 'Listen Example',
-               ),
-             ),
-           ),
+          // Only show Listen Example button for Tajweed lessons
+          if (widget.lesson.category == 'tajweed')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton.icon(
+                onPressed: _loadingAudioBySection[index] == true
+                    ? null
+                    : () => _toggleAyahAudio(index),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _playingAudioBySection[index] == true
+                      ? Colors.red
+                      : widget.lesson.color,
+                  foregroundColor: Colors.white,
+                ),
+                icon: _loadingAudioBySection[index] == true
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        _playingAudioBySection[index] == true
+                            ? Icons.stop_circle_rounded
+                            : Icons.play_arrow_rounded,
+                      ),
+                label: Text(
+                  _loadingAudioBySection[index] == true
+                      ? 'Loading...'
+                      : _playingAudioBySection[index] == true
+                          ? 'Stop'
+                          : 'Listen Example',
+                ),
+              ),
+            ),
           if (section.showWordByWord) ...<Widget>[
             const SizedBox(height: 12),
             if (_loadingWordsBySection[index] == true)
