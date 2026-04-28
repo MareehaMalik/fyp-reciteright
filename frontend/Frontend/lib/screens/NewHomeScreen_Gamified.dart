@@ -6,6 +6,7 @@ import 'ProfileScreen.dart';
 import 'EnhancedReciteScreen.dart';
 import 'TajweedLessonsScreen.dart';
 import 'EnhancedProgressScreen.dart';
+import 'QuizHomeScreen.dart';
 import 'SurahListScreen.dart';
 import 'package:tajweed_corrector/screens/MistakesScreen.dart';
 import 'package:tajweed_corrector/screens/MemorizationScreen.dart';
@@ -1225,6 +1226,7 @@ class _NewHomeScreenState extends State<NewHomeScreen>
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
         BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Lessons'),
+        BottomNavigationBarItem(icon: Icon(Icons.quiz_rounded), label: 'Quiz'),
         BottomNavigationBarItem(
             icon: Icon(Icons.trending_up), label: 'Progress'),
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
@@ -1243,11 +1245,17 @@ class _NewHomeScreenState extends State<NewHomeScreen>
           case 2:
             Navigator.push(
               context,
+              MaterialPageRoute(builder: (context) => const QuizHomeScreen()),
+            );
+            break;
+          case 3:
+            Navigator.push(
+              context,
               MaterialPageRoute(
                   builder: (context) => const EnhancedProgressScreen()),
             );
             break;
-          case 3:
+          case 4:
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const ProfileScreen()),

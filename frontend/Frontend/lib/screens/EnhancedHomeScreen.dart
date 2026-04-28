@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tajweed_corrector/screens/TajweedLessonsScreen.dart';
 import 'package:tajweed_corrector/screens/ProgressScreen.dart';
+import 'package:tajweed_corrector/screens/QuizHomeScreen.dart';
 import 'package:tajweed_corrector/screens/ProfileScreen.dart';
 
 class EnhancedHomeScreen extends StatefulWidget {
@@ -13,12 +14,17 @@ class EnhancedHomeScreen extends StatefulWidget {
 class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const TajweedLessonsScreen(),
-    const ProgressScreen(),
-    const ProfileScreen(),
-  ];
+  void _changeTab(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  List<Widget> get _pages => [
+        DashboardPage(onSelectTab: _changeTab),
+        const TajweedLessonsScreen(),
+        const QuizHomeScreen(),
+        const ProgressScreen(),
+        const ProfileScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +49,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
             label: 'Lessons',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.quiz_rounded),
+            label: 'Quiz',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.trending_up),
             label: 'Progress',
           ),
@@ -57,7 +67,9 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> {
 }
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  final ValueChanged<int> onSelectTab;
+
+  const DashboardPage({super.key, required this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -164,13 +176,7 @@ class DashboardPage extends StatelessWidget {
                     title: 'Lessons',
                     description: 'Learn Tajweed',
                     onTap: () {
-                      // Navigate to Lessons tab
-                      final state = context
-                          .findAncestorStateOfType<_EnhancedHomeScreenState>();
-                      if (state != null) {
-                        state._selectedIndex = 1;
-                        state.setState(() {});
-                      }
+                      onSelectTab(1);
                     },
                   ),
                 ),
@@ -182,13 +188,7 @@ class DashboardPage extends StatelessWidget {
                     title: 'Recite',
                     description: 'Practice',
                     onTap: () {
-                      // Navigate to Lessons tab to start recitation
-                      final state = context
-                          .findAncestorStateOfType<_EnhancedHomeScreenState>();
-                      if (state != null) {
-                        state._selectedIndex = 1;
-                        state.setState(() {});
-                      }
+                      onSelectTab(1);
                     },
                   ),
                 ),
@@ -204,12 +204,7 @@ class DashboardPage extends StatelessWidget {
                     title: 'Progress',
                     description: 'Track Stats',
                     onTap: () {
-                      final state = context
-                          .findAncestorStateOfType<_EnhancedHomeScreenState>();
-                      if (state != null) {
-                        state._selectedIndex = 2;
-                        state.setState(() {});
-                      }
+                      onSelectTab(3);
                     },
                   ),
                 ),
@@ -221,12 +216,7 @@ class DashboardPage extends StatelessWidget {
                     title: 'Profile',
                     description: 'Settings',
                     onTap: () {
-                      final state = context
-                          .findAncestorStateOfType<_EnhancedHomeScreenState>();
-                      if (state != null) {
-                        state._selectedIndex = 3;
-                        state.setState(() {});
-                      }
+                      onSelectTab(4);
                     },
                   ),
                 ),

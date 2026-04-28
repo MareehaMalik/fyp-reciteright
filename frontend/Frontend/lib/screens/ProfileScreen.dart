@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:tajweed_corrector/services/user_service.dart';
+import 'package:tajweed_corrector/services/quiz_service.dart';
+import 'package:tajweed_corrector/models/quiz_models.dart';
 import 'package:tajweed_corrector/screens/Loginpage.dart';
 import 'package:tajweed_corrector/screens/AvatarSelectionScreen.dart';
+import 'package:tajweed_corrector/screens/QuizHistoryScreen.dart';
 import 'package:tajweed_corrector/widgets/index.dart';
+import 'package:tajweed_corrector/widgets/quiz_streak_banner.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -187,6 +192,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            if (user != null) ...[
+              QuizStreakBanner(
+                userId: user.uid,
+                userName: displayName,
+              ),
+              const SizedBox(height: 12),
+            ],
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -370,6 +382,94 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             const SizedBox(height: 24),
 
+            // Quiz Stats Section
+            FutureBuilder<Map<String, dynamic>>(
+              future: QuizService().getUserQuizStats(user?.uid ?? ''),
+              builder: (context, snapshot) {
+                final stats = snapshot.data ?? {};
+                final totalQuizzes = (stats['totalQuizzes'] ?? 0) as int;
+                final averageScore = (stats['averageScore'] ?? 0.0) as double;
+                
+                return FutureBuilder<QuizStreakData?>(
+                  future: QuizService().getStreakData(user?.uid ?? ''),
+                  builder: (context, streakSnapshot) {
+                    final streak = streakSnapshot.data;
+                    
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Quiz Stats',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E4976),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildQuizStatItem(
+                                icon: '🔥',
+                                value: '${streak?.currentStreak ?? 0}',
+                                label: 'Streak',
+                              ),
+                              _buildQuizStatItem(
+                                icon: '📊',
+                                value: '$totalQuizzes',
+                                label: 'Quizzes',
+                              ),
+                              _buildQuizStatItem(
+                                icon: '⭐',
+                                value: averageScore.toStringAsFixed(1),
+                                label: 'Avg Score',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const QuizHistoryScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.history),
+                              label: const Text('View Quiz History'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E4976),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -481,11 +581,40 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  @override
-  void dispose() {
-    _avatarAnimationController.dispose();
-    super.dispose();
-  }
+   @override
+   void dispose() {
+     _avatarAnimationController.dispose();
+     super.dispose();
+   }
+
+   Widget _buildQuizStatItem({
+     required String icon,
+     required String value,
+     required String label,
+   }) {
+     return Column(
+       children: [
+         Text(icon, style: GoogleFonts.poppins(fontSize: 24)),
+         const SizedBox(height: 6),
+         Text(
+           value,
+           style: GoogleFonts.poppins(
+             fontSize: 16,
+             fontWeight: FontWeight.bold,
+             color: const Color(0xFF1E4976),
+           ),
+         ),
+         const SizedBox(height: 4),
+         Text(
+           label,
+           style: GoogleFonts.poppins(
+             fontSize: 11,
+             color: Colors.grey.shade600,
+           ),
+         ),
+       ],
+     );
+   }
 
   String _formatMemberSince(dynamic rawDate) {
     DateTime? parsed;

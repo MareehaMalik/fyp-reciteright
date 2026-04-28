@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
+
 import '../models/tajweed_lesson.dart';
 import '../services/quran_lesson_service.dart';
 import '../widgets/word_by_word_widget.dart';
@@ -9,10 +10,7 @@ import './LessonQuizScreen.dart';
 class LessonDetailScreen extends StatefulWidget {
   final TajweedLesson lesson;
 
-  const LessonDetailScreen({
-    Key? key,
-    required this.lesson,
-  }) : super(key: key);
+  const LessonDetailScreen({super.key, required this.lesson});
 
   @override
   State<LessonDetailScreen> createState() => _LessonDetailScreenState();
@@ -20,107 +18,207 @@ class LessonDetailScreen extends StatefulWidget {
 
 class _LessonDetailScreenState extends State<LessonDetailScreen>
     with TickerProviderStateMixin {
-  late TabController _tabController;
-  late PageController _pageController;
-  int _currentSectionIndex = 0;
-  late AudioPlayer _audioPlayer;
-  bool _isLoadingAudio = false;
-  List<QuranWord> _currentWords = [];
-  bool _isLoadingWords = false;
+  late final TabController _tabController;
+  late final AudioPlayer _audioPlayer;
 
   final QuranLessonService _service = QuranLessonService();
+  final Map<int, bool> _loadingAudioBySection = <int, bool>{};
+  final Map<int, bool> _playingAudioBySection = <int, bool>{};
+  final Map<int, bool> _loadingWordsBySection = <int, bool>{};
+  final Map<int, List<QuranWord>> _wordsBySection = <int, List<QuranWord>>{};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _pageController = PageController();
     _audioPlayer = AudioPlayer();
-    _loadCurrentSectionWords();
+
+    // Stop audio when switching tabs
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        _audioPlayer.stop();
+        if (mounted) {
+          setState(() => _playingAudioBySection.clear());
+        }
+      }
+    });
+
+    _audioPlayer.playerStateStream.listen((PlayerState state) {
+      _onAudioStateChanged(state);
+    });
+  }
+
+  void _onAudioStateChanged(PlayerState state) {
+    if (!mounted) return;
+    setState(() {
+      // Update playing states based on audio state
+      if (state.processingState == ProcessingState.completed) {
+        _playingAudioBySection.clear();
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _pageController.dispose();
+    _audioPlayer.stop();
     _audioPlayer.dispose();
     super.dispose();
   }
 
-  Future<void> _loadCurrentSectionWords() async {
-    if (_currentSectionIndex < widget.lesson.sections.length) {
-      final section = widget.lesson.sections[_currentSectionIndex];
-      if (section.showWordByWord) {
-        setState(() => _isLoadingWords = true);
-        try {
-          final words = await _service.fetchWordByWord(
-            section.exampleSurah,
-            section.exampleAyah,
-          );
-          setState(() {
-            _currentWords = words;
-            _isLoadingWords = false;
-          });
-        } catch (e) {
-          setState(() => _isLoadingWords = false);
-        }
-      }
+  Future<void> _loadSectionWords(int index) async {
+    final section = widget.lesson.sections[index];
+    if (!section.showWordByWord || _wordsBySection.containsKey(index)) {
+      return;
+    }
+
+    setState(() => _loadingWordsBySection[index] = true);
+    try {
+      final words = await _service.fetchWordByWord(
+        section.exampleSurah,
+        section.exampleAyah,
+      );
+      if (!mounted) return;
+      setState(() {
+        _wordsBySection[index] = words;
+        _loadingWordsBySection[index] = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingWordsBySection[index] = false);
     }
   }
 
-  Future<void> _playAyah() async {
-    final section = widget.lesson.sections[_currentSectionIndex];
+  Future<void> _toggleAyahAudio(int index) async {
+    final isCurrentlyPlaying = _playingAudioBySection[index] ?? false;
+
+    if (isCurrentlyPlaying) {
+      // Stop audio
+      await _audioPlayer.stop();
+      if (!mounted) return;
+      setState(() => _playingAudioBySection[index] = false);
+      return;
+    }
+
+    // Stop any other audio that might be playing
+    await _audioPlayer.stop();
+    if (!mounted) return;
+
+    final section = widget.lesson.sections[index];
     final audioUrl = _service.getAyahAudioUrl(
       section.exampleSurah,
       section.exampleAyah,
     );
 
     try {
-      setState(() => _isLoadingAudio = true);
+      setState(() {
+        _loadingAudioBySection[index] = true;
+        _playingAudioBySection.clear(); // Clear all other playing indicators
+        _playingAudioBySection[index] = false; // Reset this one
+      });
+      
       await _audioPlayer.setUrl(audioUrl);
       await _audioPlayer.play();
-      if (mounted) {
-        setState(() => _isLoadingAudio = false);
-      }
+      
+      if (!mounted) return;
+      setState(() {
+        _loadingAudioBySection[index] = false;
+        _playingAudioBySection[index] = true;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingAudio = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error playing audio: $e')),
-        );
-      }
-    }
-  }
-
-  void _nextSection() {
-    if (_currentSectionIndex < widget.lesson.sections.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+      if (!mounted) return;
+      setState(() {
+        _loadingAudioBySection[index] = false;
+        _playingAudioBySection[index] = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to play audio: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  void _goToQuiz() {
-    _tabController.animateTo(1);
+  /// Parse section title and return TextSpans with proper font rendering
+  /// Splits title on '(' and ')' to separate English and Arabic/Unicode content
+  List<TextSpan> _parseSectionTitle(String title) {
+    final regex = RegExp(r'(.*?)\((.*?)\)(.*)');
+    final match = regex.firstMatch(title);
+
+    if (match != null) {
+      final beforeBracket = match.group(1)?.trim() ?? '';
+      final insideBracket = match.group(2)?.trim() ?? '';
+      final afterBracket = match.group(3)?.trim() ?? '';
+
+      return <TextSpan>[
+        if (beforeBracket.isNotEmpty)
+          TextSpan(
+            text: beforeBracket,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: widget.lesson.color,
+            ),
+          ),
+        TextSpan(
+          text: ' ($insideBracket)',
+          style: GoogleFonts.scheherazadeNew(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: widget.lesson.color,
+          ),
+        ),
+        if (afterBracket.isNotEmpty)
+          TextSpan(
+            text: afterBracket,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: widget.lesson.color,
+            ),
+          ),
+      ];
+    }
+
+    // Fallback if no brackets found
+    return <TextSpan>[
+      TextSpan(
+        text: title,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          color: widget.lesson.color,
+        ),
+      ),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: isDark ? const Color(0xFF101418) : const Color(0xFFF4F7FB),
       appBar: AppBar(
-        title: Text(widget.lesson.title),
-        backgroundColor: widget.lesson.color,
+        title: Text(
+          widget.lesson.title,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: theme.primaryColor,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
-        children: [
-          // Hero header with gradient
+        children: <Widget>[
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [widget.lesson.color, widget.lesson.color.withValues(alpha: 0.7)],
+                colors: <Color>[
+                  widget.lesson.color,
+                  widget.lesson.color.withValues(alpha: 0.75),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -128,7 +226,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: <Widget>[
                 Container(
                   width: 60,
                   height: 60,
@@ -136,18 +234,15 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.2),
                   ),
-                  child: Center(
-                    child: Text(
-                      widget.lesson.icon,
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                  ),
+                  alignment: Alignment.center,
+                  child: Text(widget.lesson.icon, style: const TextStyle(fontSize: 32)),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   widget.lesson.arabicTitle,
+                  textDirection: TextDirection.rtl,
                   style: GoogleFonts.scheherazadeNew(
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -163,28 +258,24 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
               ],
             ),
           ),
-          // TabBar
           Container(
-            color: Colors.white,
+            color: theme.cardColor,
             child: TabBar(
               controller: _tabController,
               labelColor: widget.lesson.color,
-              unselectedLabelColor: Colors.grey,
+              unselectedLabelColor: theme.textTheme.bodySmall?.color,
               indicatorColor: widget.lesson.color,
-              tabs: const [
+              tabs: const <Tab>[
                 Tab(text: '📖 Learn'),
                 Tab(text: '✏️ Practice'),
               ],
             ),
           ),
-          // Tab content
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                // Learn tab
-                _buildLearnTab(),
-                // Practice tab
+              children: <Widget>[
+                _buildLearnTab(context),
                 LessonQuizScreen(lesson: widget.lesson),
               ],
             ),
@@ -194,235 +285,250 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     );
   }
 
-  Widget _buildLearnTab() {
-    return PageView(
-      controller: _pageController,
-      onPageChanged: (index) {
-        setState(() {
-          _currentSectionIndex = index;
-        });
-        _loadCurrentSectionWords();
-      },
-      children: List.generate(widget.lesson.sections.length, (index) {
+  Widget _buildLearnTab(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+      itemCount: widget.lesson.sections.length,
+      itemBuilder: (BuildContext context, int index) {
         final section = widget.lesson.sections[index];
-        return _buildSectionPage(section);
-      }),
+        return _buildSectionTile(context, section, index);
+      },
     );
   }
 
-  Widget _buildSectionPage(LessonSection section) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section title
-          Text(
-            section.title,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: widget.lesson.color,
+  Widget _buildSectionTile(BuildContext context, LessonSection section, int index) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border(
+          left: BorderSide(color: widget.lesson.color, width: 6),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ExpansionTile(
+        title: RichText(
+          text: TextSpan(
+            children: _parseSectionTitle(section.title),
+          ),
+        ),
+        subtitle: Text(
+          'Example: ${section.exampleSurah}:${section.exampleAyah}',
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.textTheme.bodySmall?.color,
+          ),
+        ),
+        onExpansionChanged: (bool expanded) {
+          if (expanded) {
+            _loadSectionWords(index);
+          }
+        },
+        childrenPadding: const EdgeInsets.fromLTRB(14, 2, 14, 14),
+        children: <Widget>[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              section.explanation,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.65,
+                color: theme.textTheme.bodyMedium?.color,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          // Explanation
-          Text(
-            section.explanation,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.8,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Arabic example box
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: widget.lesson.color.withValues(alpha: 0.1),
-              border: Border.all(
-                color: widget.lesson.color,
-                width: 2,
-              ),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: widget.lesson.color.withValues(alpha: 0.45)),
             ),
-            padding: const EdgeInsets.all(16),
             child: Column(
-              children: [
+              children: <Widget>[
                 Text(
                   section.arabicExample,
                   textDirection: TextDirection.rtl,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.scheherazadeNew(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
                     color: widget.lesson.color,
+                    height: 1.65,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   section.transliteration,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 12,
                     fontStyle: FontStyle.italic,
-                    color: Colors.grey,
+                    fontSize: 13,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 20),
-          // Audio player button
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: _isLoadingAudio ? null : _playAyah,
-              icon: _isLoadingAudio
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.play_arrow),
-              label: Text(_isLoadingAudio ? 'Loading...' : 'Play Ayah Audio'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: widget.lesson.color,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Word by word widget
-          if (section.showWordByWord)
-            _isLoadingWords
-                ? const Center(child: CircularProgressIndicator())
-                : _currentWords.isNotEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Word by Word',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: widget.lesson.color,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          WordByWordWidget(words: _currentWords),
-                        ],
-                      )
-                    : const SizedBox.shrink(),
-          const SizedBox(height: 20),
-          // Tip card
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.yellow[50],
-              border: Border.all(
-                color: Colors.yellow[700]!,
-                width: 2,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '💡',
-                  style: const TextStyle(fontSize: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tip',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.yellow[700],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        section.tip,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Navigation buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _currentSectionIndex > 0
-                      ? () => _pageController.previousPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          )
-                      : null,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Previous'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _currentSectionIndex < widget.lesson.sections.length - 1
-                    ? ElevatedButton.icon(
-                        onPressed: _nextSection,
-                        icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Next'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.lesson.color,
-                          foregroundColor: Colors.white,
-                        ),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: _goToQuiz,
-                        icon: const Icon(Icons.quiz),
-                        label: const Text('Go to Quiz'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-              ),
-            ],
           ),
           const SizedBox(height: 12),
-          // Page indicator dots
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                widget.lesson.sections.length,
-                (index) => Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: index == _currentSectionIndex
-                        ? widget.lesson.color
-                        : Colors.grey[300],
-                  ),
+          _buildHowToLearnCard(section.howToLearn),
+          const SizedBox(height: 10),
+          _buildCommonMistakeCard(section.commonMistake),
+          const SizedBox(height: 10),
+          _buildTipCard(section.tip),
+          const SizedBox(height: 12),
+          // Only show Listen Example button for Tajweed lessons
+          if (widget.lesson.category == 'tajweed')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton.icon(
+                onPressed: _loadingAudioBySection[index] == true
+                    ? null
+                    : () => _toggleAyahAudio(index),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _playingAudioBySection[index] == true
+                      ? Colors.red
+                      : widget.lesson.color,
+                  foregroundColor: Colors.white,
+                ),
+                icon: _loadingAudioBySection[index] == true
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        _playingAudioBySection[index] == true
+                            ? Icons.stop_circle_rounded
+                            : Icons.play_arrow_rounded,
+                      ),
+                label: Text(
+                  _loadingAudioBySection[index] == true
+                      ? 'Loading...'
+                      : _playingAudioBySection[index] == true
+                          ? 'Stop'
+                          : 'Listen Example',
                 ),
               ),
             ),
+          if (section.showWordByWord) ...<Widget>[
+            const SizedBox(height: 12),
+            if (_loadingWordsBySection[index] == true)
+              const Center(child: CircularProgressIndicator())
+            else if ((_wordsBySection[index] ?? <QuranWord>[]).isNotEmpty)
+              WordByWordWidget(words: _wordsBySection[index]!)
+            else
+              Text(
+                'Word-by-word data unavailable for this example.',
+                style: TextStyle(color: theme.textTheme.bodySmall?.color),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHowToLearnCard(String howToLearn) {
+    final theme = Theme.of(context);
+    final lines = howToLearn
+        .split('\n')
+        .map((String line) => line.trim())
+        .where((String line) => line.isNotEmpty)
+        .toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'How to Learn',
+            style: TextStyle(
+              color: theme.primaryColor,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          ...List<Widget>.generate(lines.length, (int i) {
+            final normalized = lines[i].replaceFirst(RegExp(r'^\d+[\.)]?\s*'), '');
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Text('${i + 1}. $normalized', style: const TextStyle(height: 1.55)),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommonMistakeCard(String commonMistake) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Common Mistake',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(commonMistake, style: const TextStyle(height: 1.55)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTipCard(String tip) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text('💡', style: TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Tip',
+                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(tip, style: const TextStyle(height: 1.55)),
+              ],
+            ),
+          ),
         ],
       ),
     );
