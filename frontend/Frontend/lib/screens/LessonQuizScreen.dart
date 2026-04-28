@@ -6,10 +6,7 @@ import '../models/tajweed_lesson.dart';
 class LessonQuizScreen extends StatefulWidget {
   final TajweedLesson lesson;
 
-  const LessonQuizScreen({
-    Key? key,
-    required this.lesson,
-  }) : super(key: key);
+  const LessonQuizScreen({super.key, required this.lesson});
 
   @override
   State<LessonQuizScreen> createState() => _LessonQuizScreenState();
@@ -125,7 +122,7 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${_score} of ${widget.lesson.questions.length} correct',
+            '$_score of ${widget.lesson.questions.length} correct',
             style: const TextStyle(
               fontSize: 16,
               color: Colors.grey,
