@@ -338,7 +338,7 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
     duration: '18 min',
     sections: <LessonSection>[
       LessonSection(
-        title: 'Fatha ($fathaMark)',
+        title: "Fatha ($fathaMark)",
         explanation: 'Fatha is a small diagonal stroke written above a letter. It produces a short a sound as in cat. It appears frequently in Quranic words and must stay short. Without fatha, the letter does not carry that vowel quality.',
         arabicExample: '\u0628\u064e \u2014 \u0643\u064e\u062a\u064e\u0628\u064e \u2014 \u0641\u064e\u062a\u064e\u062d\u064e',
         transliteration: 'ba - kataba - fataha',
@@ -350,7 +350,7 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
         showWordByWord: true,
       ),
       LessonSection(
-        title: 'Damma ($dammaMark)',
+        title: "Damma ($dammaMark)",
         explanation: 'Damma is a small waw-like mark above the letter. It gives a short u sound, similar to put. It appears in nouns and verbs and should be kept brief. Lip rounding must be present but minimal.',
         arabicExample: '\u0628\u064f \u2014 \u0643\u064f\u062a\u064f\u0628\u064c \u2014 \u0631\u064f\u0633\u064f\u0644\u064c',
         transliteration: 'bu - kutubun - rusulun',
@@ -362,7 +362,7 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
         showWordByWord: true,
       ),
       LessonSection(
-        title: 'Kasra ($kasraMark)',
+        title: "Kasra ($kasraMark)",
         explanation: 'Kasra is the short i mark placed below the letter. It sounds like i in sit and appears often in prepositional structures. Proper kasra keeps recitation clear and balanced. It must not be extended into long ee unless followed by a madd ya.',
         arabicExample: '\u0628\u0650 \u2014 \u0628\u0650\u0633\u0652\u0645\u0650 \u2014 \u0631\u064e\u0628\u0651\u0650',
         transliteration: 'bi - bismi - rabbi',
@@ -374,7 +374,7 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
         showWordByWord: true,
       ),
       LessonSection(
-        title: 'Sukoon ($sukoonMark)',
+        title: "Sukoon ($sukoonMark)",
         explanation: 'Sukoon is the small circle showing no vowel follows the letter. The consonant is pronounced then stopped cleanly. This affects many Tajweed interactions, especially noon and meem rules. Correct sukoon handling prevents accidental vowel insertion.',
         arabicExample: '\u0628\u0652 \u2014 \u0645\u0650\u0646\u0652 \u2014 \u0639\u064e\u0646\u0652 \u2014 \u0644\u064e\u0645\u0652',
         transliteration: 'b (stop) - min - an - lam',
@@ -386,7 +386,7 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
         showWordByWord: true,
       ),
       LessonSection(
-        title: 'Shadda ($shaddaMark)',
+        title: "Shadda ($shaddaMark)",
         explanation: 'Shadda marks a doubled consonant. The first part carries a stop-like hold and the second part carries the vowel. This changes meaning, rhythm, and Tajweed timing. Reading shadda as a single letter creates major pronunciation errors.',
         arabicExample: '\u0631\u064e\u0628\u0651\u0650 \u2014 \u0634\u064e\u062f\u0651\u064e \u2014 \u0645\u064e\u062f\u0651\u064e',
         transliteration: 'rabbi - shadda - madda',
@@ -400,25 +400,25 @@ final List<TajweedLesson> lessons = <TajweedLesson>[
     ],
     questions: <QuizQuestion>[
       QuizQuestion(
-        question: 'Fatha ($fathaMark) makes which sound?',
+        question: "Fatha ($fathaMark) makes which sound?",
         options: <String>['i', 'u', 'a', 'No sound'],
         correctIndex: 2,
         explanation: 'Fatha produces a short a sound.',
       ),
       QuizQuestion(
-        question: 'What does sukoon ($sukoonMark) indicate?',
+        question: "What does sukoon ($sukoonMark) indicate?",
         options: <String>['Long vowel', 'No vowel', 'Nasal hold', 'Merge letter'],
         correctIndex: 1,
         explanation: 'Sukoon means the letter has no following vowel.',
       ),
       QuizQuestion(
-        question: 'What is the key effect of shadda ($shaddaMark)?',
+        question: "What is the key effect of shadda ($shaddaMark)?",
         options: <String>['Silence', 'Doubling', 'Lengthening vowel', 'Changing makhraj'],
         correctIndex: 1,
         explanation: 'Shadda doubles the consonant.',
       ),
       QuizQuestion(
-        question: 'Tanwin ($tanwinFathMark$tanwinDammMark$tanwinKasrMark) appears mostly at?',
+        question: "Tanwin ($tanwinFathMark$tanwinDammMark$tanwinKasrMark) appears mostly at?",
         options: <String>['Word start', 'Word middle', 'Word end', 'Any position'],
         correctIndex: 2,
         explanation: 'Tanwin is generally written at word endings.',

@@ -23,6 +23,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
 
   final QuranLessonService _service = QuranLessonService();
   final Map<int, bool> _loadingAudioBySection = <int, bool>{};
+  final Map<int, bool> _playingAudioBySection = <int, bool>{};
   final Map<int, bool> _loadingWordsBySection = <int, bool>{};
   final Map<int, List<QuranWord>> _wordsBySection = <int, List<QuranWord>>{};
 
@@ -31,11 +32,36 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _audioPlayer = AudioPlayer();
+    
+    // Stop audio when switching tabs
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        _audioPlayer.stop();
+        if (mounted) {
+          setState(() => _playingAudioBySection.clear());
+        }
+      }
+    });
+    
+    _audioPlayer.playerStateStream.listen((PlayerState state) {
+      _onAudioStateChanged(state);
+    });
+  }
+
+  void _onAudioStateChanged(PlayerState state) {
+    if (!mounted) return;
+    setState(() {
+      // Update playing states based on audio state
+      if (state.processingState == ProcessingState.completed) {
+        _playingAudioBySection.clear();
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _audioPlayer.stop();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -63,7 +89,21 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     }
   }
 
-  Future<void> _playAyahForSection(int index) async {
+  Future<void> _toggleAyahAudio(int index) async {
+    final isCurrentlyPlaying = _playingAudioBySection[index] ?? false;
+
+    if (isCurrentlyPlaying) {
+      // Stop audio
+      await _audioPlayer.stop();
+      if (!mounted) return;
+      setState(() => _playingAudioBySection[index] = false);
+      return;
+    }
+
+    // Stop any other audio that might be playing
+    await _audioPlayer.stop();
+    if (!mounted) return;
+
     final section = widget.lesson.sections[index];
     final audioUrl = _service.getAyahAudioUrl(
       section.exampleSurah,
@@ -71,14 +111,26 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     );
 
     try {
-      setState(() => _loadingAudioBySection[index] = true);
+      setState(() {
+        _loadingAudioBySection[index] = true;
+        _playingAudioBySection.clear(); // Clear all other playing indicators
+        _playingAudioBySection[index] = false; // Reset this one
+      });
+      
       await _audioPlayer.setUrl(audioUrl);
       await _audioPlayer.play();
+      
       if (!mounted) return;
-      setState(() => _loadingAudioBySection[index] = false);
+      setState(() {
+        _loadingAudioBySection[index] = false;
+        _playingAudioBySection[index] = true;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loadingAudioBySection[index] = false);
+      setState(() {
+        _loadingAudioBySection[index] = false;
+        _playingAudioBySection[index] = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to play audio: $e'),
@@ -86,6 +138,60 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
         ),
       );
     }
+  }
+
+  /// Parse section title and return TextSpans with proper font rendering
+  /// Splits title on '(' and ')' to separate English and Arabic/Unicode content
+  List<TextSpan> _parseSectionTitle(String title) {
+    final regex = RegExp(r'(.*?)\((.*?)\)(.*)');
+    final match = regex.firstMatch(title);
+
+    if (match != null) {
+      final beforeBracket = match.group(1)?.trim() ?? '';
+      final insideBracket = match.group(2)?.trim() ?? '';
+      final afterBracket = match.group(3)?.trim() ?? '';
+
+      return <TextSpan>[
+        if (beforeBracket.isNotEmpty)
+          TextSpan(
+            text: beforeBracket,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: widget.lesson.color,
+            ),
+          ),
+        TextSpan(
+          text: ' ($insideBracket)',
+          style: GoogleFonts.scheherazadeNew(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: widget.lesson.color,
+          ),
+        ),
+        if (afterBracket.isNotEmpty)
+          TextSpan(
+            text: afterBracket,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: widget.lesson.color,
+            ),
+          ),
+      ];
+    }
+
+    // Fallback if no brackets found
+    return <TextSpan>[
+      TextSpan(
+        text: title,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          color: widget.lesson.color,
+        ),
+      ),
+    ];
   }
 
   @override
@@ -96,9 +202,13 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF101418) : const Color(0xFFF4F7FB),
       appBar: AppBar(
-        title: Text(widget.lesson.title),
+        title: Text(
+          widget.lesson.title,
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: theme.primaryColor,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
         children: <Widget>[
@@ -206,12 +316,9 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
         ],
       ),
       child: ExpansionTile(
-        title: Text(
-          section.title,
-          style: TextStyle(
-            color: widget.lesson.color,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
+        title: RichText(
+          text: TextSpan(
+            children: _parseSectionTitle(section.title),
           ),
         ),
         subtitle: Text(
@@ -280,31 +387,41 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
           const SizedBox(height: 10),
           _buildTipCard(section.tip),
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ElevatedButton.icon(
-              onPressed: _loadingAudioBySection[index] == true
-                  ? null
-                  : () => _playAyahForSection(index),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: widget.lesson.color,
-                foregroundColor: Colors.white,
-              ),
-              icon: _loadingAudioBySection[index] == true
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.play_arrow_rounded),
-              label: Text(
-                _loadingAudioBySection[index] == true ? 'Loading...' : 'Listen Example',
-              ),
-            ),
-          ),
+           Align(
+             alignment: Alignment.centerLeft,
+             child: ElevatedButton.icon(
+               onPressed: _loadingAudioBySection[index] == true
+                   ? null
+                   : () => _toggleAyahAudio(index),
+               style: ElevatedButton.styleFrom(
+                 backgroundColor: _playingAudioBySection[index] == true
+                     ? Colors.red
+                     : widget.lesson.color,
+                 foregroundColor: Colors.white,
+               ),
+               icon: _loadingAudioBySection[index] == true
+                   ? const SizedBox(
+                       width: 16,
+                       height: 16,
+                       child: CircularProgressIndicator(
+                         strokeWidth: 2,
+                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                       ),
+                     )
+                   : Icon(
+                       _playingAudioBySection[index] == true
+                           ? Icons.stop_circle_rounded
+                           : Icons.play_arrow_rounded,
+                     ),
+               label: Text(
+                 _loadingAudioBySection[index] == true
+                     ? 'Loading...'
+                     : _playingAudioBySection[index] == true
+                         ? 'Stop'
+                         : 'Listen Example',
+               ),
+             ),
+           ),
           if (section.showWordByWord) ...<Widget>[
             const SizedBox(height: 12),
             if (_loadingWordsBySection[index] == true)
