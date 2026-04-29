@@ -48,53 +48,33 @@ class ApiService {
     required int surahNumber,
     required int verseNumber,
     required String referenceAudioUrl,
+    String? qariId,
   }) async {
     try {
-      // Encode user audio to base64
-      final audioBase64 = base64.encode(userAudioBytes);
-
-      // Prepare request
-      final requestData = {
-        'audio_base64': audioBase64,
-        'reference_audio_url': referenceAudioUrl,
-        'surah': surahNumber,
-        'verse': verseNumber,
-        'filename': 'user_recording.wav',
-      };
+      final resolvedQariId = qariId ?? _inferQariIdFromReferenceUrl(referenceAudioUrl);
 
       print('📤 Sending comparison request to backend...');
       print('   Surah: $surahNumber, Verse: $verseNumber');
       print('   Reference URL: $referenceAudioUrl');
       print('   User audio size: ${userAudioBytes.length} bytes');
 
-      // Primary path: multipart (matches backend /api/compare used in main app flow).
-      Response<dynamic> response;
-      try {
-        final multipartData = FormData.fromMap({
-          'surah': surahNumber.toString(),
-          'ayah': verseNumber.toString(),
-          'reference_audio_url': referenceAudioUrl,
-          'filename': 'user_recording.wav',
-          'audio': MultipartFile.fromBytes(
-            userAudioBytes,
-            filename: 'user_recording.wav',
-          ),
-        });
+      final multipartData = FormData.fromMap({
+        'surah': surahNumber.toString(),
+        'ayah': verseNumber.toString(),
+        'qari_id': resolvedQariId,
+        'reference_audio_url': referenceAudioUrl,
+        'filename': 'user_recording.wav',
+        'audio': MultipartFile.fromBytes(
+          userAudioBytes,
+          filename: 'user_recording.wav',
+        ),
+      });
 
-        response = await _dio.post(
-          '/api/compare',
-          data: multipartData,
-          options: Options(contentType: 'multipart/form-data'),
-        );
-      } on DioException catch (e) {
-        // Fallback path for deployments expecting JSON/base64 payload.
-        final code = e.response?.statusCode ?? 0;
-        if (code == 400 || code == 404 || code == 415 || code == 422) {
-          response = await _dio.post('/api/compare', data: requestData);
-        } else {
-          rethrow;
-        }
-      }
+      final Response<dynamic> response = await _dio.post(
+        '/api/compare',
+        data: multipartData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
 
       if (response.statusCode == 200) {
         print('✅ Comparison successful!');
@@ -117,9 +97,12 @@ class ApiService {
         // Log results
         final overallScore = (result['overall_score'] as num?)?.toDouble() ?? 0.0;
         final grade = result['grade']?.toString() ?? 'Unknown';
+        final metrics = Map<String, dynamic>.from(result['metrics'] as Map? ?? const {});
+        final hybrid = Map<String, dynamic>.from(result['hybrid_scoring'] as Map? ?? const {});
         print('   Overall Score: ${overallScore.toStringAsFixed(1)}%');
         print('   Grade: $grade');
-        print('   DTW Distance: ${result['dtw_distance']}');
+        print('   DTW Score: ${metrics['dtw_score']}');
+        print('   Confidence Multiplier: ${hybrid['confidence_multiplier']}');
         print('   Inference Time: ${result['inference_time_ms']} ms');
 
         return result;
@@ -144,6 +127,18 @@ class ApiService {
     } catch (e) {
       throw Exception('Comparison failed: $e');
     }
+  }
+
+  String _inferQariIdFromReferenceUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    if (lowerUrl.contains('/abdulbaset/mujawwad/')) return '1';
+    if (lowerUrl.contains('/husary/')) return '5';
+    if (lowerUrl.contains('/ghamdi/')) return '12';
+    if (lowerUrl.contains('/sudais/')) return '9';
+    if (lowerUrl.contains('everyayah.com/data/husary_64kbps/')) return '5';
+    if (lowerUrl.contains('everyayah.com/data/husary_mujawwad_64kbps/')) return '5';
+    if (lowerUrl.contains('everyayah.com/data/ghamadi_40kbps/')) return '12';
+    return '7';
   }
 
   /// Predict Tajweed errors in user's recitation using trained model
@@ -324,11 +319,19 @@ class ComparisonResultData {
         ?.map((w) => WordScore.fromJson(w as Map<String, dynamic>))
         .toList();
 
+    final metrics =
+        json['metrics'] is Map<String, dynamic>
+            ? json['metrics'] as Map<String, dynamic>
+            : <String, dynamic>{};
+
     return ComparisonResultData(
       success: json['success'] as bool? ?? false,
       overallScore: (json['overall_score'] as num?)?.toDouble() ?? 0.0,
       grade: json['grade'] as String? ?? 'Unknown',
-      dtwDistance: (json['dtw_distance'] as num?)?.toDouble() ?? 0.0,
+      dtwDistance:
+          (metrics['dtw_score'] as num?)?.toDouble() ??
+          (json['dtw_distance'] as num?)?.toDouble() ??
+          0.0,
       userWaveform: List<double>.from(
         (json['user_waveform'] as List?)?.map((x) => (x as num).toDouble()) ??
             [],
@@ -351,6 +354,7 @@ class ComparisonResultData {
         'overall_score': overallScore,
         'grade': grade,
         'dtw_distance': dtwDistance,
+        'dtw_score': dtwDistance,
         'user_waveform': userWaveform,
         'reference_waveform': referenceWaveform,
         'word_scores': wordScores?.map((w) => w.toJson()).toList(),

@@ -1,11 +1,38 @@
 7) Very short viva answers you can memorize
 DTW
-DTW means Dynamic Time Warping. It compares two audio sequences even if one is recited faster or slower, so it is useful for matching user recitation with the reference qari.
+DTW means Dynamic Time Warping. It compares two audio sequences even 
+if one is recited faster or slower, so it is useful for matching user 
+recitation with the reference qari.
+
 Faster-Whisper
-Faster-Whisper is the speech-to-text model we use to transcribe the user’s Arabic recitation into text before comparison.
-Phoneme
-A phoneme is the smallest sound unit of a language. We use phoneme-level comparison to check pronunciation accuracy.
+Faster-Whisper is the speech-to-text model we use to transcribe the user’s 
+Arabic recitation into text before comparison.
+
+Phoneme:
+A phoneme is the smallest unit of sound in a language that can change the meaning of a word. 
+We use phoneme-level comparison to check
+pronunciation accuracy.
+We use phonemes to analyze each sound in the user’s recitation and compare it with the correct pronunciation
+
 Tajweed
-Tajweed is the set of rules for correct Quran recitation, including pronunciation, elongation, nasalization, stopping, and merging rules.
+Tajweed is the set of rules for correct Quran recitation, including pronunciation, 
+elongation, nasalization, stopping, and merging rules.
 Number of Tajweed rules
-Our project detects 9 main Tajweed rule families, and some of them are further divided into detailed sub-rules.
+Our project detects 9 main Tajweed rule families, 
+and some of them are further divided into detailed sub-rules.
+
+
+Librosa is a Python library used for audio and music analysis.
+It helps you process sound files (like .wav, .mp3) and extract useful features from them.
+
+
+What is Mel-frequency cepstral coefficients (MFCC)?
+
+MFCC is a feature extraction technique used in audio processing, especially for:
+
+Speech recognition (like Google Assistant)
+Speaker identification
+Emotion detection from voice
+
+👉 In simple words:
+MFCC converts raw audio into numbers that represent how humans hear sound.

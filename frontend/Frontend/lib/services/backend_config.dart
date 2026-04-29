@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// Shared backend host configuration.
 ///
 /// You can override this at build/run time:
-/// flutter run --dart-define=BACKEND_BASE_URL=http://192.168.1.100:8000
+/// flutter run --dart-define=BACKEND_BASE_URL=http://192.168.100.11:8000
 class BackendConfig {
   static const String baseUrl = String.fromEnvironment(
     'BACKEND_BASE_URL',
