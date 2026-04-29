@@ -1,0 +1,82 @@
+{
+  "id": "bb7318db-2234-4c28-979f-f2d742529861",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 2,
+  "ayah": 3,
+  "mode": "practice",
+  "accuracy_score": 77.1,
+  "whisper_score": 78.1,
+  "mfcc_score": 100.0,
+  "date_time": "2026-04-28T23:59:19.682055Z",
+  "duration_seconds": 44,
+  "mistakes": [
+    {
+      "word": "ٱلَّذِينَ",
+      "ayah": 3,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.8,
+      "occurredAt": "2026-04-28T23:59:01.452967Z"
+    },
+    {
+      "word": "بِٱلْغَيْبِ",
+      "ayah": 3,
+      "surah": 2,
+      "tajweedRules": [
+        "Tafkhim"
+      ],
+      "errorType": "close",
+      "similarity": 0.83,
+      "occurredAt": "2026-04-28T23:59:01.453032Z"
+    },
+    {
+      "word": "ٱلصَّلَوةَ",
+      "ayah": 3,
+      "surah": 2,
+      "tajweedRules": [
+        "Shadda",
+        "Tafkhim"
+      ],
+      "errorType": "close",
+      "similarity": 0.5,
+      "occurredAt": "2026-04-28T23:59:01.453060Z"
+    },
+    {
+      "word": "رَزَقْنَـهُمْ",
+      "ayah": 3,
+      "surah": 2,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Izhar Shafawi",
+        "Tafkhim"
+      ],
+      "errorType": "close",
+      "similarity": 0.73,
+      "occurredAt": "2026-04-28T23:59:01.453087Z"
+    },
+    {
+      "word": "يُنفِقُونَ",
+      "ayah": 3,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Tafkhim"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-28T23:59:01.453110Z"
+    }
+  ],
+  "total_words": 8,
+  "correct_words": 3,
+  "close_words": 4,
+  "missing_words": 1,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/002003.mp3",
+  "transcribed_text": "الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُكِيمُونَ السَّلَاةَ وَمِمْ مَرَزَقْنَـٰ",
+  "correct_text": "ٱلَّذِينَ يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوةَ وَمِمَّا رَزَقْنَـهُمْ يُنفِقُونَ"
+}

@@ -1,0 +1,46 @@
+{
+  "id": "20ef7420-9af9-45f0-847e-dc0d2a1f102f",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 1,
+  "ayah": 3,
+  "mode": "practice",
+  "accuracy_score": 78.1,
+  "whisper_score": 85.0,
+  "mfcc_score": 100.0,
+  "date_time": "2026-04-28T23:52:39.616349Z",
+  "duration_seconds": 73,
+  "mistakes": [
+    {
+      "word": "ٱلرَّحْمَـنِ",
+      "ayah": 3,
+      "surah": 1,
+      "tajweedRules": [
+        "Qalqalah Minor",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.67,
+      "occurredAt": "2026-04-28T23:52:21.378647Z"
+    },
+    {
+      "word": "ٱلرَّحِيمِ",
+      "ayah": 3,
+      "surah": 1,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.62,
+      "occurredAt": "2026-04-28T23:52:21.378726Z"
+    }
+  ],
+  "total_words": 2,
+  "correct_words": 0,
+  "close_words": 2,
+  "missing_words": 0,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/001003.mp3",
+  "transcribed_text": "الرَّحْمَالِ الرَّحِيمِ",
+  "correct_text": "ٱلرَّحْمَـنِ ٱلرَّحِيمِ"
+}

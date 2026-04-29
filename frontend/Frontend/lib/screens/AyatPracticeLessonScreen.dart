@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:tajweed_corrector/data/quran_data.dart';
+import 'package:tajweed_corrector/services/backend_config.dart';
 import 'package:tajweed_corrector/services/lesson_recording_service.dart';
 import 'package:tajweed_corrector/services/api_service.dart';
 import 'package:tajweed_corrector/widgets/tajweed_text_widget.dart';
@@ -43,6 +45,7 @@ class _AyatPracticeLessonScreenState extends State<AyatPracticeLessonScreen> {
     _qariPlayer = AudioPlayer();
     selectedSurah = widget.initialSurah ?? 1; // Default to Al-Fatiha
     selectedVerse = widget.initialVerse ?? 1;
+    unawaited(_prefetchQariAudio());
 
     // Listen to Qari player state changes
     _qariPlayer.playerStateStream.listen((playerState) {
@@ -160,6 +163,20 @@ class _AyatPracticeLessonScreenState extends State<AyatPracticeLessonScreen> {
       print('❌ Comparison error: $e');
       _showSnackBar('❌ Comparison error: $e', Colors.red);
     }
+  }
+
+  Future<void> _prefetchQariAudio() async {
+    final surah = selectedSurah;
+    final verse = selectedVerse;
+    if (surah == null || verse == null) return;
+
+    try {
+      final baseUrl = BackendConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
+      final uri = Uri.parse(
+        '$baseUrl/api/prefetch-qari?surah=$surah&ayah=$verse',
+      );
+      await http.get(uri).timeout(const Duration(seconds: 10));
+    } catch (_) {}
   }
 
   /// Generate dummy audio bytes for testing
@@ -293,6 +310,7 @@ class _AyatPracticeLessonScreenState extends State<AyatPracticeLessonScreen> {
                             selectedSurah = newValue;
                             selectedVerse = 1; // Reset verse when surah changes
                           });
+                          unawaited(_prefetchQariAudio());
                         }
                       },
                       items: getAvailableSurahs()
@@ -335,6 +353,7 @@ class _AyatPracticeLessonScreenState extends State<AyatPracticeLessonScreen> {
                           setState(() {
                             selectedVerse = newValue;
                           });
+                          unawaited(_prefetchQariAudio());
                         }
                       },
                       items: getAvailableVerses(selectedSurah ?? 1)

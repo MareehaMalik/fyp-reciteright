@@ -23,6 +23,7 @@ import re
 from difflib import SequenceMatcher
 import whisper
 import torch
+import threading
 import soundfile as sf
 try:
     import noisereduce as nr
@@ -35,6 +36,60 @@ from flask import copy_current_request_context
 app = Flask(__name__)
 CORS(app)
 
+qari_cache = {}
+QARI_CACHE_DIR = os.path.join(tempfile.gettempdir(), "reciteright_cache")
+QARI_CACHE_CLEANUP_INTERVAL_SECONDS = 30 * 60
+QARI_CACHE_MAX_AGE_SECONDS = 2 * 60 * 60
+_qari_cleanup_thread_started = False
+
+
+def _cleanup_qari_cache_once():
+    os.makedirs(QARI_CACHE_DIR, exist_ok=True)
+    now = time.time()
+    stale_paths = set()
+
+    for filename in os.listdir(QARI_CACHE_DIR):
+        if not filename.startswith("qari_") or not filename.endswith(".mp3"):
+            continue
+
+        filepath = os.path.join(QARI_CACHE_DIR, filename)
+        if not os.path.isfile(filepath):
+            continue
+
+        if now - os.path.getmtime(filepath) <= QARI_CACHE_MAX_AGE_SECONDS:
+            continue
+
+        try:
+            os.remove(filepath)
+            stale_paths.add(filepath)
+        except OSError:
+            pass
+
+    if stale_paths:
+        keys_to_delete = [
+            key for key, path in list(qari_cache.items()) if path in stale_paths
+        ]
+        for key in keys_to_delete:
+            qari_cache.pop(key, None)
+
+
+def _start_qari_cache_cleanup_thread():
+    global _qari_cleanup_thread_started
+    if _qari_cleanup_thread_started:
+        return
+
+    def _cleanup_loop():
+        _cleanup_qari_cache_once()
+        while True:
+            time.sleep(QARI_CACHE_CLEANUP_INTERVAL_SECONDS)
+            _cleanup_qari_cache_once()
+
+    cleanup_thread = threading.Thread(target=_cleanup_loop, daemon=True)
+    cleanup_thread.start()
+    _qari_cleanup_thread_started = True
+
+
+_start_qari_cache_cleanup_thread()
 
 # Timeout handler for long-running requests (Windows-compatible)
 from threading import Timer
@@ -88,12 +143,20 @@ with open("model/file_names.json") as f:
 print(f"✅ Model ready! {len(file_names)} reference ayaat loaded.")
 
 # ── Load OpenAI Whisper model for transcription ───────────────────────────────
-WHISPER_MODEL_NAME = "large-v3-turbo"
+# Use a smaller default on CPU to keep /api/compare response times practical.
+DEFAULT_WHISPER_MODEL = "large-v3-turbo" if torch.cuda.is_available() else "small"
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL_NAME", DEFAULT_WHISPER_MODEL)
 WHISPER_CACHE_DIR = r"F:\.cache\whisper"
 WHISPER_MODEL_PATH = os.path.join(WHISPER_CACHE_DIR, f"{WHISPER_MODEL_NAME}.pt")
 ASR_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+try:
+    COMPARE_TIMEOUT_SECONDS = int(os.getenv("COMPARE_TIMEOUT_SECONDS", "300"))
+except ValueError:
+    COMPARE_TIMEOUT_SECONDS = 300
+
 print(f"🔄 Loading OpenAI Whisper model ({WHISPER_MODEL_NAME}) on {ASR_DEVICE}...")
+print(f"⏱️ Compare timeout set to {COMPARE_TIMEOUT_SECONDS}s")
 try:
     whisper_model = whisper.load_model(
         WHISPER_MODEL_NAME,
@@ -723,18 +786,36 @@ def detect_tajweed_rules(word, next_word=""):
 def download_qari(surah, ayah):
     s   = str(surah).zfill(3)
     a   = str(ayah).zfill(3)
+    cache_key = f"{surah}:{ayah}"
     url = f"https://verses.quran.com/Alafasy/mp3/{s}{a}.mp3"
+
+    if cache_key in qari_cache and os.path.exists(qari_cache[cache_key]):
+        return qari_cache[cache_key], url
+
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, timeout=15, headers=headers)
         if r.status_code == 200 and len(r.content) > 1000:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-            tmp.write(r.content)
-            tmp.close()
-            return tmp.name, url
+            os.makedirs(QARI_CACHE_DIR, exist_ok=True)
+            save_path = os.path.join(QARI_CACHE_DIR, f"qari_{surah}_{ayah}.mp3")
+
+            with open(save_path, "wb") as tmp:
+                tmp.write(r.content)
+
+            qari_cache[cache_key] = save_path
+            return save_path, url
     except:
         pass
     return None, url
+
+@app.route("/api/prefetch-qari", methods=["GET"])
+def prefetch_qari():
+    surah = request.args.get("surah", "1")
+    ayah = request.args.get("ayah", "1")
+    path, url = download_qari(surah, ayah)
+    if path:
+        return jsonify({"success": True, "cached": True, "url": url})
+    return jsonify({"success": False, "url": url})
 
 def get_grade(score):
     if score >= 85: return "Excellent ✨"
@@ -1227,7 +1308,7 @@ def qari_url():
     return jsonify({"url": url})
 
 @app.route("/api/compare", methods=["POST"])
-@with_timeout(120)  # Reduced from 175s to 120s - enforce faster processing
+@with_timeout(COMPARE_TIMEOUT_SECONDS)
 def compare():
     start = time.time()
 
@@ -1293,7 +1374,7 @@ def compare():
                 "error": "No recitation detected. Please recite clearly and try again.",
                 "reason": "no_speech_detected",
                 "speech_activity": speech_stats
-            }, 422)
+            }), 422
 
         transcription_meta = transcribe_audio(processed_path, expected_text=correct_text)
         t_transcribe = time.time() - start
@@ -1607,7 +1688,7 @@ def compare():
         return jsonify({"error": str(e), "success": False, "traceback": error_trace}), 500
 
     finally:
-        for path in [user_tmp.name, processed_path, qari_path]:
+        for path in [user_tmp.name, processed_path]:
             if path and os.path.exists(path):
                 try:
                     os.unlink(path)
@@ -1764,5 +1845,6 @@ except Exception as e:
     traceback.print_exc()
 
 if __name__ == "__main__":
-    # Disable reloader so Whisper is not loaded twice in debug mode.
-    app.run(debug=True, use_reloader=False, port=8000, host="0.0.0.0")
+    print("🚀 API Running at http://0.0.0.0:8000/")
+    # Change whatever you have to this:
+    app.run(host='0.0.0.0', port=8000, debug=True, use_reloader=False, threaded=True)

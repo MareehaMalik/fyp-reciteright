@@ -225,6 +225,19 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
     _loadMemorizationStatuses();
   }
 
+  Future<void> _prefetchQariAudio(int ayahNumber) async {
+    final surahNumber = widget.surah['number'];
+    if (surahNumber is! int) return;
+
+    try {
+      final baseUrl = BackendConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
+      final uri = Uri.parse(
+        '$baseUrl/api/prefetch-qari?surah=$surahNumber&ayah=$ayahNumber',
+      );
+      await http.get(uri).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
   void _setupAudioListeners() {
     _player.durationStream.listen((d) {
       if (!mounted) return;
@@ -292,6 +305,11 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
           _rangeEndAyah = _ayahs.first['number'] as int;
         }
       });
+
+      if (!mounted || _selectedAyahIndex == null || _ayahs.isEmpty) return;
+      unawaited(
+        _prefetchQariAudio(_ayahs[_selectedAyahIndex!]['number'] as int),
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoadingAyahs = false);
@@ -363,6 +381,10 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
     if (autoplay) {
       await _playSelectedAyah();
     }
+
+    unawaited(
+      _prefetchQariAudio(_ayahs[clampedIndex]['number'] as int),
+    );
   }
 
   Future<void> _goToNextAyah({bool autoplay = false}) async {
@@ -494,10 +516,10 @@ class _AyahDisplayScreenState extends State<AyahDisplayScreen> {
       );
 
       final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 180),
+        const Duration(seconds: 360),
       );
       final httpResponse = await http.Response.fromStream(streamedResponse)
-          .timeout(const Duration(seconds: 180));
+          .timeout(const Duration(seconds: 360));
       final body = httpResponse.body;
       final result =
       body.isNotEmpty

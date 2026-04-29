@@ -1,0 +1,164 @@
+{
+  "id": "f1ade1af-a35b-4afc-8e01-a515e586c70b",
+  "user_id": "NeJxawwRSfbWJvljPI2e4BctRff2",
+  "surah": 2,
+  "ayah": 14,
+  "mode": "practice",
+  "accuracy_score": 54.8,
+  "whisper_score": 38.8,
+  "mfcc_score": 100.0,
+  "date_time": "2026-04-29T00:05:07.538451Z",
+  "duration_seconds": 43,
+  "mistakes": [
+    {
+      "word": "ٱلَّذِينَ",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.8,
+      "occurredAt": "2026-04-29T00:04:49.211858Z"
+    },
+    {
+      "word": "ءَامَنُوا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i"
+      ],
+      "errorType": "close",
+      "similarity": 0.77,
+      "occurredAt": "2026-04-29T00:04:49.211974Z"
+    },
+    {
+      "word": "قَالُوٓا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Madd Munfasil",
+        "Tafkhim"
+      ],
+      "errorType": "close",
+      "similarity": 0.83,
+      "occurredAt": "2026-04-29T00:04:49.212023Z"
+    },
+    {
+      "word": "ءَامَنَّا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Ghunnah",
+        "Shadda"
+      ],
+      "errorType": "close",
+      "similarity": 0.8,
+      "occurredAt": "2026-04-29T00:04:49.212077Z"
+    },
+    {
+      "word": "إِلَى",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212154Z"
+    },
+    {
+      "word": "شَيَـطِينِهِمْ",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Izhar Shafawi",
+        "Tafkhim"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212207Z"
+    },
+    {
+      "word": "قَالُوٓا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Tafkhim"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212261Z"
+    },
+    {
+      "word": "إِنَّا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Ghunnah",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212307Z"
+    },
+    {
+      "word": "مَعَكُمْ",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Izhar Shafawi"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212346Z"
+    },
+    {
+      "word": "إِنَّمَا",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i",
+        "Ghunnah",
+        "Shadda"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212389Z"
+    },
+    {
+      "word": "نَحْنُ",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Qalqalah Minor"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212435Z"
+    },
+    {
+      "word": "مُسْتَهْزِءُونَ",
+      "ayah": 14,
+      "surah": 2,
+      "tajweedRules": [
+        "Madd Tabee'i"
+      ],
+      "errorType": "missing",
+      "similarity": 0.0,
+      "occurredAt": "2026-04-29T00:04:49.212476Z"
+    }
+  ],
+  "total_words": 16,
+  "correct_words": 4,
+  "close_words": 4,
+  "missing_words": 8,
+  "extra_words": 0,
+  "reference_audio_url": "https://verses.quran.com/Alafasy/mp3/002014.mp3",
+  "transcribed_text": "وَإِذَا لَقُوا۟ الَّذِينَ عَامَنُوا۟ وَقَالُوا۟ وَآمَنَّا وَإِذَا خَلَوْا۟",
+  "correct_text": "وَإِذَا لَقُوا ٱلَّذِينَ ءَامَنُوا قَالُوٓا ءَامَنَّا وَإِذَا خَلَوْا إِلَى شَيَـطِينِهِمْ قَالُوٓا إِنَّا مَعَكُمْ إِنَّمَا نَحْنُ مُسْتَهْزِءُونَ"
+}
